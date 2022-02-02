@@ -3,7 +3,6 @@ package sqlitefs
 import (
 	"errors"
 	"io/fs"
-	"log"
 	"strconv"
 	"time"
 )
@@ -23,8 +22,6 @@ func (f File) Close() error {
 }
 
 func (f *File) Read(buf []byte) (int, error) {
-	log.Println("READ", len(buf), f.offset)
-
 	var contentFragment string
 	row := f.fs.db.QueryRow(`
 		SELECT
