@@ -2,7 +2,10 @@ module github.com/jilio/sqlitefs
 
 go 1.17
 
-require github.com/gin-gonic/gin v1.7.7
+require (
+	github.com/gin-gonic/gin v1.7.7
+	modernc.org/sqlite v1.14.5
+)
 
 require (
 	github.com/gin-contrib/sse v0.1.0 // indirect
@@ -32,7 +35,6 @@ require (
 	modernc.org/mathutil v1.4.1 // indirect
 	modernc.org/memory v1.0.5 // indirect
 	modernc.org/opt v0.1.1 // indirect
-	modernc.org/sqlite v1.14.5 // indirect
 	modernc.org/strutil v1.1.1 // indirect
 	modernc.org/token v1.0.0 // indirect
 )
