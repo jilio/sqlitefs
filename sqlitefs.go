@@ -4,41 +4,62 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
-	"strings"
 )
 
-type FS struct {
-	db        *sql.DB
-	tableName string
+// SQLiteFS реализует интерфейс http.FileSystem для файлов, хранящихся в SQLite.
+type SQLiteFS struct {
+	db *sql.DB
 }
 
-func NewFS(db *sql.DB, tableName string) *FS {
-	return &FS{
-		db:        db,
-		tableName: tableName,
+// NewSQLiteFS создает новый экземпляр SQLiteFS с заданной базой данных.
+// Проверяет наличие необходимых таблиц и создает их при отсутствии.
+func NewSQLiteFS(db *sql.DB) (*SQLiteFS, error) {
+	fs := &SQLiteFS{db: db}
+
+	// Создание таблиц, если они не существуют
+	err := fs.createTablesIfNeeded()
+	if err != nil {
+		return nil, err
 	}
+
+	return fs, nil
 }
 
-func (sfs FS) Init() error {
-	if sfs.tableName == "" {
-		return errors.New("sqlitefs: table name cannot be empty")
+// Open открывает файл по указанному пути.
+func (fs *SQLiteFS) Open(name string) (http.File, error) {
+	// Проверка существования файла в базе данных
+	var exists bool
+	err := fs.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path = ?)", name).Scan(&exists)
+	if err != nil {
+		return nil, err
 	}
 
-	_, err := sfs.db.Exec(`
-		create table if not exists ` + sfs.tableName + `(
-			id text primary key,
-			name text unique not null,
-			modified_at text default 0,
-			content blob
-		);`,
-	)
+	if !exists {
+		return nil, errors.New("file does not exist")
+	}
+
+	// Создание и возврат объекта, реализующего интерфейс File
+	return NewSQLiteFile(fs.db, name), nil
+}
+
+// createTablesIfNeeded создает таблицы file_metadata и file_fragments, если они еще не созданы.
+func (fs *SQLiteFS) createTablesIfNeeded() error {
+	_, err := fs.db.Exec(`
+        CREATE TABLE IF NOT EXISTS file_metadata (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            path TEXT UNIQUE NOT NULL,
+            type TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS file_fragments (
+            file_id INTEGER NOT NULL,
+            fragment_index INTEGER NOT NULL,
+            fragment BLOB NOT NULL,
+            PRIMARY KEY (file_id, fragment_index),
+            FOREIGN KEY (file_id) REFERENCES file_metadata(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_file_metadata_path ON file_metadata(path);
+        CREATE INDEX IF NOT EXISTS idx_file_fragments_length ON file_fragments(file_id, length(fragment));
+    `)
+
 	return err
-}
-
-func (sfs FS) Open(name string) (http.File, error) {
-	file := &File{
-		Name: strings.TrimLeft(name, "/"),
-		fs:   &sfs,
-	}
-	return file, nil
 }
