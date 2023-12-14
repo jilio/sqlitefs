@@ -2,25 +2,27 @@
 
 **sqlitefs** - пакет для подключения sqlite3 таблицы в качестве файловой системы.
 
+<img src="sqlitefs.png" width="100"/>
+
 ## Использование
 
 `go get github.com/jilio/sqlitefs`
-
-Для корректной работы в базе данных должна быть таблица для хранения файлов. Если таблицы нет, то её можно создать при помощи `Init` (см. тесты).
-
-Если таблица для файлов есть, то можно пользоваться (см. `examples/ginexample`):
 
 ```go
 db, err := sql.Open("sqlite", "sample.db")
 if err != nil {
     panic(err)
 }
+defer db.Close()
 
-sfs := sqlitefs.NewFS(db, "files")
+sfs, err := sqlitefs.NewSQLiteFS(db)
+if err != nil {
+    panic(err)
+}
 
 r := gin.Default()
-r.GET("/aquila.png", func(c *gin.Context) {
-    c.FileFromFS("images/aquila.png", sfs)
+r.GET("/logo.png", func(c *gin.Context) {
+    c.FileFromFS("/images/sqlitefs.png", sfs)
 })
-r.Run()
+r.Run() 
 ```

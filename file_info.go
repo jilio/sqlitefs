@@ -2,35 +2,20 @@ package sqlitefs
 
 import (
 	"io/fs"
+	"os"
 	"time"
 )
 
-type FileInfo struct {
-	name       string    `db:"name"`
-	size       int64     `db:"size"`
-	modifiedAt time.Time `db:"modified_at"`
+type fileInfo struct {
+	name    string
+	size    int64
+	modTime time.Time
+	isDir   bool
 }
 
-func (info FileInfo) Name() string {
-	return info.name
-}
-
-func (info FileInfo) Size() int64 {
-	return info.size
-}
-
-func (info FileInfo) ModTime() time.Time {
-	return info.modifiedAt
-}
-
-func (info FileInfo) IsDir() bool {
-	return false
-}
-
-func (info FileInfo) Sys() interface{} {
-	return nil
-}
-
-func (info FileInfo) Mode() fs.FileMode {
-	return fs.ModePerm
-}
+func (fi *fileInfo) Name() string       { return fi.name }
+func (fi *fileInfo) Size() int64        { return fi.size }
+func (fi *fileInfo) Mode() os.FileMode  { return fs.ModePerm }
+func (fi *fileInfo) ModTime() time.Time { return fi.modTime }
+func (fi *fileInfo) IsDir() bool        { return fi.isDir }
+func (fi *fileInfo) Sys() interface{}   { return nil }

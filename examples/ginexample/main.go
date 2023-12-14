@@ -13,12 +13,16 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer db.Close()
 
-	sfs := sqlitefs.NewFS(db, "files")
+	sfs, err := sqlitefs.NewSQLiteFS(db)
+	if err != nil {
+		panic(err)
+	}
 
 	r := gin.Default()
-	r.GET("/aquila.png", func(c *gin.Context) {
-		c.FileFromFS("images/aquila.png", sfs)
+	r.GET("/logo.png", func(c *gin.Context) {
+		c.FileFromFS("/images/sqlitefs.png", sfs)
 	})
 	r.Run() // listen and serve on 0.0.0.0:8080
 }
