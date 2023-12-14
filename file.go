@@ -15,51 +15,81 @@ type SQLiteFile struct {
 	db     *sql.DB
 	path   string
 	offset int64 // текущее смещение для операций чтения
-	// Дополнительные поля, если необходимо
+	size   int64 // общий размер файла
 }
 
 // NewSQLiteFile создает новый экземпляр SQLiteFile для заданного пути.
-func NewSQLiteFile(db *sql.DB, path string) *SQLiteFile {
-	return &SQLiteFile{
+func NewSQLiteFile(db *sql.DB, path string) (*SQLiteFile, error) {
+	file := &SQLiteFile{
 		db:   db,
 		path: path,
 	}
+
+	// Инициализация размера файла
+	size, err := file.getTotalSize()
+	if err != nil {
+		return nil, err
+	}
+	file.size = size
+
+	return file, nil
 }
 
 func (f *SQLiteFile) Read(p []byte) (int, error) {
-	// todo: неправильно происходит чтение
-	// В случае, если нужно прочитать буфер, который покрывает несколько фрагментов,
-	// то происходит чтение только первого фрагмента
+	bytesReadTotal := 0
+	for {
+		// Вычисляем индекс текущего фрагмента и смещение внутри этого фрагмента
+		fragmentIndex := f.offset / fragmentSize
+		internalOffset := f.offset % fragmentSize
 
-	fragmentIndex := f.offset / fragmentSize
-	internalOffset := f.offset % fragmentSize
-	readLength := int64(len(p))
-	if internalOffset+readLength > fragmentSize {
-		readLength = fragmentSize - internalOffset
-	}
+		// Определяем, сколько байтов нужно прочитать из текущего фрагмента
+		readLength := min(fragmentSize-internalOffset, int64(len(p))-int64(bytesReadTotal))
 
-	query := `SELECT SUBSTR(fragment, ?, ?) FROM file_fragments WHERE file_id = (SELECT id FROM file_metadata WHERE path = ?) AND fragment_index = ?`
-	row := f.db.QueryRow(query, internalOffset+1, readLength, f.path, fragmentIndex)
-
-	var fragment []byte
-	err := row.Scan(&fragment)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// Нет данных для чтения, возможно достигнут конец файла
-			return 0, io.EOF
+		// Если запрос выходит за пределы файла, возвращаем EOF
+		if f.offset >= f.size {
+			if bytesReadTotal == 0 {
+				return 0, io.EOF
+			}
+			return bytesReadTotal, nil
 		}
-		return 0, err
+
+		// SQL-запрос для чтения подстроки фрагмента
+		query := `SELECT SUBSTR(fragment, ?, ?) FROM file_fragments WHERE file_id = (SELECT id FROM file_metadata WHERE path = ?) AND fragment_index = ?`
+		row := f.db.QueryRow(query, internalOffset+1, readLength, f.path, fragmentIndex)
+
+		var fragment []byte
+		err := row.Scan(&fragment)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				// Если мы прочитали некоторые данные, возвращаем их количество
+				if bytesReadTotal > 0 {
+					return bytesReadTotal, nil
+				}
+				// Иначе возвращаем EOF
+				return 0, io.EOF
+			}
+			return bytesReadTotal, err
+		}
+
+		// Копируем прочитанные данные в буфер p
+		bytesRead := copy(p[bytesReadTotal:], fragment)
+		bytesReadTotal += bytesRead
+		f.offset += int64(bytesRead) // Обновляем смещение в файле
+
+		// Если bytesRead равно 0 и это последний фрагмент, возвращаем то, что прочитано
+		if bytesRead == 0 {
+			if f.offset >= f.size {
+				return bytesReadTotal, nil
+			}
+			continue // Продолжаем чтение следующего фрагмента
+		}
+
+		// Если мы прочитали все запрошенные данные, возвращаем результат
+		if bytesReadTotal == len(p) {
+			break
+		}
 	}
-
-	bytesRead := copy(p, fragment)
-	f.offset += int64(bytesRead)
-
-	// Возвращаем EOF, если не было прочитано никаких данных
-	if bytesRead == 0 {
-		return 0, io.EOF
-	}
-
-	return bytesRead, nil
+	return bytesReadTotal, nil
 }
 
 func (f *SQLiteFile) Seek(offset int64, whence int) (int64, error) {

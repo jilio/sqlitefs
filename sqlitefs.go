@@ -39,7 +39,7 @@ func (fs *SQLiteFS) Open(name string) (http.File, error) {
 	}
 
 	// Создание и возврат объекта, реализующего интерфейс File
-	return NewSQLiteFile(fs.db, name), nil
+	return NewSQLiteFile(fs.db, name)
 }
 
 // createTablesIfNeeded создает таблицы file_metadata и file_fragments, если они еще не созданы.
