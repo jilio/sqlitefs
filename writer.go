@@ -49,8 +49,17 @@ func (w *SQLiteWriter) Write(p []byte) (n int, err error) {
 		startIndex = endIndex
 	}
 
+	// Если все данные записаны и буфер пуст, создаем запись файла
+	if len(w.buffer) == 0 && w.fragmentIndex == 0 {
+		err = w.createFileRecord()
+		if err != nil {
+			return n, err
+		}
+	}
+
 	return n, nil
 }
+
 func (w *SQLiteWriter) writeFragment() error {
 	// Проверка на наличие файла в базе данных и создание записи, если необходимо
 	if w.fragmentIndex == 0 {
@@ -67,7 +76,7 @@ func (w *SQLiteWriter) writeFragment() error {
 	}
 
 	// Очистка буфера и увеличение индекса фрагмента
-	w.buffer = make([]byte, 0, w.fragmentSize)
+	w.buffer = w.buffer[:0]
 	w.fragmentIndex++
 
 	return nil
@@ -81,20 +90,34 @@ func (w *SQLiteWriter) createFileRecord() error {
 		mimeType = "application/octet-stream" // Значение по умолчанию
 	}
 
-	_, err := w.db.Exec("INSERT INTO file_metadata (path, type) VALUES (?, ?)", w.path, mimeType)
-	if err != nil {
+	// Проверка наличия записи файла в базе данных по пути файла
+	var fileID int64
+	err := w.db.QueryRow("SELECT id FROM file_metadata WHERE path = ?", w.path).Scan(&fileID)
+	if err == sql.ErrNoRows {
+		// Создание новой записи файла
+		result, err := w.db.Exec("INSERT INTO file_metadata (path, type) VALUES (?, ?)", w.path, mimeType)
+		if err != nil {
+			return err
+		}
+		fileID, err = result.LastInsertId()
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
 		return err
 	}
 
-	// Получение и сохранение ID файла
-	err = w.db.QueryRow("SELECT id FROM file_metadata WHERE path = ?", w.path).Scan(&w.fileID)
-	return err
+	w.fileID = int(fileID)
+	return nil
 }
 
 func (w *SQLiteWriter) Close() error {
-	if len(w.buffer) > 0 {
+	if len(w.buffer) > 0 || w.fragmentIndex == 0 {
 		// Запись оставшегося буфера как последнего фрагмента
-		return w.writeFragment()
+		err := w.writeFragment()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
