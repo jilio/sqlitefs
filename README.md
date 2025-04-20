@@ -14,7 +14,7 @@ SQLiteFS is a Go package that implements the `fs.FS` interface using SQLite as a
 
 To use SQLiteFS in your Go project, run the following command:
 
-```
+```sh
 go get github.com/jilio/sqlitefs
 ```
 
@@ -51,7 +51,7 @@ func main() {
  defer sqliteFS.Close()
 
  // Write a file
- writer := sqlitefs.NewSQLiteWriter(sqliteFS, "example.txt")
+ writer := sqliteFS.NewWriter("example.txt")
  _, err = writer.Write([]byte("Hello, SQLiteFS!"))
  if err != nil {
   log.Fatal(err)

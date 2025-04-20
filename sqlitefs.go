@@ -42,6 +42,11 @@ func NewSQLiteFS(db *sql.DB) (*SQLiteFS, error) {
 	return fs, nil
 }
 
+// NewWriter creates a new writer for the specified path.
+func (fs *SQLiteFS) NewWriter(path string) *SQLiteWriter {
+	return NewSQLiteWriter(fs, path)
+}
+
 // Open открывает файл по указанному пути.
 func (fs *SQLiteFS) Open(name string) (fs.File, error) {
 	// Проверка существования файла в базе данных
