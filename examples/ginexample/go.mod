@@ -4,7 +4,7 @@ go 1.22.0
 
 require (
 	github.com/gin-gonic/gin v1.9.1
-	github.com/jilio/sqlitefs v0.2.0
+	github.com/jilio/sqlitefs v0.0.0
 	modernc.org/sqlite v1.29.2
 )
 
@@ -45,3 +45,5 @@ require (
 	modernc.org/strutil v1.2.0 // indirect
 	modernc.org/token v1.1.0 // indirect
 )
+
+replace github.com/jilio/sqlitefs => ../../

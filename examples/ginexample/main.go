@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jilio/sqlitefs"
@@ -22,7 +23,7 @@ func main() {
 
 	r := gin.Default()
 	r.GET("/logo.png", func(c *gin.Context) {
-		c.FileFromFS("/images/sqlitefs.png", sfs)
+		c.FileFromFS("/images/sqlitefs.png", http.FS(sfs))
 	})
 	r.Run() // listen and serve on 0.0.0.0:8080
 }
