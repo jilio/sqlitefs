@@ -47,21 +47,64 @@ func (fs *SQLiteFS) NewWriter(path string) *SQLiteWriter {
 	return NewSQLiteWriter(fs, path)
 }
 
-// Open открывает файл по указанному пути.
+// Open opens the named file.
 func (fs *SQLiteFS) Open(name string) (fs.File, error) {
-	// Проверка существования файла в базе данных
+	// Clean the path - remove leading slash if present
+	if name == "" || name == "." {
+		name = "/"
+	}
+
+	// Remove leading slash for database lookup
+	dbPath := name
+	if len(dbPath) > 0 && dbPath[0] == '/' {
+		dbPath = dbPath[1:]
+	}
+
+	// Check if the file exists directly
 	var exists bool
-	err := fs.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path = ?)", name).Scan(&exists)
+	err := fs.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path = ?)", dbPath).Scan(&exists)
 	if err != nil {
 		return nil, err
 	}
 
-	if !exists {
-		return nil, errors.New("file does not exist")
+	if exists {
+		return NewSQLiteFile(fs.db, dbPath)
 	}
 
-	// Создание и возврат объекта, реализующего интерфейс File
-	return NewSQLiteFile(fs.db, name)
+	// If not found directly, check if it's a directory by looking for files with this prefix
+	// This handles the case where the directory itself isn't explicitly stored
+	dirPath := dbPath
+	if len(dirPath) > 0 && dirPath[len(dirPath)-1] != '/' {
+		dirPath += "/"
+	}
+
+	err = fs.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path LIKE ? LIMIT 1)", dirPath+"%").Scan(&exists)
+	if err != nil {
+		return nil, err
+	}
+
+	if exists {
+		// It's a directory, create a directory file
+		return NewSQLiteFile(fs.db, dirPath)
+	}
+
+	return nil, fs.Error("file does not exist", name)
+}
+
+// Error returns a formatted error that includes the path
+func (fs *SQLiteFS) Error(msg, path string) error {
+	return &PathError{Op: "open", Path: path, Err: errors.New(msg)}
+}
+
+// PathError records an error and the operation and file path that caused it.
+type PathError struct {
+	Op   string
+	Path string
+	Err  error
+}
+
+func (e *PathError) Error() string {
+	return e.Op + " " + e.Path + ": " + e.Err.Error()
 }
 
 // createTablesIfNeeded создает таблицы file_metadata и file_fragments, если они еще не созданы.
