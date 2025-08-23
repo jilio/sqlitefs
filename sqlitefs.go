@@ -73,19 +73,30 @@ func (fs *SQLiteFS) Open(name string) (fs.File, error) {
 
 	// If not found directly, check if it's a directory by looking for files with this prefix
 	// This handles the case where the directory itself isn't explicitly stored
-	dirPath := dbPath
-	if len(dirPath) > 0 && dirPath[len(dirPath)-1] != '/' {
-		dirPath += "/"
-	}
+	if dbPath == "" {
+		// Root directory - check if any files exist
+		err = fs.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata LIMIT 1)").Scan(&exists)
+		if err != nil {
+			return nil, err
+		}
+		if exists || dbPath == "" { // Root always exists even if empty
+			return NewSQLiteFile(fs.db, "")
+		}
+	} else {
+		dirPath := dbPath
+		if len(dirPath) > 0 && dirPath[len(dirPath)-1] != '/' {
+			dirPath += "/"
+		}
 
-	err = fs.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path LIKE ? LIMIT 1)", dirPath+"%").Scan(&exists)
-	if err != nil {
-		return nil, err
-	}
+		err = fs.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path LIKE ? LIMIT 1)", dirPath+"%").Scan(&exists)
+		if err != nil {
+			return nil, err
+		}
 
-	if exists {
-		// It's a directory, create a directory file
-		return NewSQLiteFile(fs.db, dirPath)
+		if exists {
+			// It's a directory, create a directory file
+			return NewSQLiteFile(fs.db, dirPath)
+		}
 	}
 
 	return nil, fs.Error("file does not exist", name)
