@@ -171,19 +171,29 @@ func (f *SQLiteFile) ReadDir(n int) ([]fs.DirEntry, error) {
 		return nil, errors.New("not a directory")
 	}
 
-	// Ensure path ends with / for directory queries
-	dirPath := f.path
-	if !strings.HasSuffix(dirPath, "/") {
-		dirPath += "/"
+	var rows *sql.Rows
+	var err error
+
+	// Handle root directory specially
+	if f.path == "" || f.path == "/" {
+		// Root directory - list all files
+		query := `SELECT path, type FROM file_metadata`
+		rows, err = f.db.Query(query)
+	} else {
+		// Ensure path ends with / for directory queries
+		dirPath := f.path
+		if !strings.HasSuffix(dirPath, "/") {
+			dirPath += "/"
+		}
+		// Query to get files in the directory
+		query := `
+			SELECT path, type 
+			FROM file_metadata 
+			WHERE path LIKE ? AND path != ?
+		`
+		rows, err = f.db.Query(query, dirPath+"%", dirPath)
 	}
 
-	// Query to get files in the directory
-	query := `
-		SELECT path, type 
-		FROM file_metadata 
-		WHERE path LIKE ? AND path != ?
-	`
-	rows, err := f.db.Query(query, dirPath+"%", dirPath)
 	if err != nil {
 		return nil, err
 	}
@@ -199,21 +209,43 @@ func (f *SQLiteFile) ReadDir(n int) ([]fs.DirEntry, error) {
 			return nil, err
 		}
 
-		// Skip the directory itself
-		if path == dirPath {
-			continue
-		}
+		// For root directory, handle paths differently
+		var childName string
+		var childPath string
+		var isSubDir bool
 
-		// Extract the immediate child name
-		relPath := strings.TrimPrefix(path, dirPath)
-		parts := strings.SplitN(relPath, "/", 2)
-		childName := parts[0]
+		if f.path == "" || f.path == "/" {
+			// Root directory - extract first path component
+			parts := strings.SplitN(path, "/", 2)
+			childName = parts[0]
+			isSubDir = len(parts) > 1 || strings.HasSuffix(path, "/")
+			childPath = childName
+			if isSubDir && !strings.HasSuffix(childPath, "/") {
+				childPath += "/"
+			}
+		} else {
+			// Get directory path
+			dirPath := f.path
+			if !strings.HasSuffix(dirPath, "/") {
+				dirPath += "/"
+			}
 
-		// If this is a subdirectory entry, add a trailing slash
-		isSubDir := len(parts) > 1 || strings.HasSuffix(path, "/")
-		childPath := dirPath + childName
-		if isSubDir && !strings.HasSuffix(childPath, "/") {
-			childPath += "/"
+			// Skip the directory itself
+			if path == dirPath {
+				continue
+			}
+
+			// Extract the immediate child name
+			relPath := strings.TrimPrefix(path, dirPath)
+			parts := strings.SplitN(relPath, "/", 2)
+			childName = parts[0]
+
+			// If this is a subdirectory entry, add a trailing slash
+			isSubDir = len(parts) > 1 || strings.HasSuffix(path, "/")
+			childPath = dirPath + childName
+			if isSubDir && !strings.HasSuffix(childPath, "/") {
+				childPath += "/"
+			}
 		}
 
 		// Skip if we've already seen this immediate child
@@ -222,10 +254,34 @@ func (f *SQLiteFile) ReadDir(n int) ([]fs.DirEntry, error) {
 		}
 		seenPaths[childPath] = true
 
-		// Create FileInfo for this child
-		fileInfo, err := f.createFileInfo(childPath)
-		if err != nil {
-			return nil, err
+		// Create FileInfo for this child - use original name, not modified path
+		// The childPath might have "/" appended for directories, but we want the clean name
+		cleanName := childName
+		if isSubDir && strings.HasSuffix(cleanName, "/") {
+			cleanName = strings.TrimSuffix(cleanName, "/")
+		}
+
+		// Create file info with proper directory flag
+		fileInfo := &fileInfo{
+			name:    cleanName,
+			size:    0, // Size will be set for files
+			modTime: time.Now(),
+			isDir:   isSubDir,
+		}
+
+		// If it's a file, get its size
+		if !isSubDir {
+			// Get file size from database
+			var size sql.NullInt64
+			query := `
+				SELECT SUM(LENGTH(fragment)) 
+				FROM file_fragments 
+				WHERE file_id = (SELECT id FROM file_metadata WHERE path = ?)
+			`
+			err = f.db.QueryRow(query, path).Scan(&size)
+			if err == nil && size.Valid {
+				fileInfo.size = size.Int64
+			}
 		}
 
 		// Convert FileInfo to DirEntry
@@ -243,7 +299,16 @@ func (f *SQLiteFile) ReadDir(n int) ([]fs.DirEntry, error) {
 	// If no entries were found, check if the directory exists
 	if len(entries) == 0 {
 		var exists bool
-		err := f.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path LIKE ?)", dirPath+"%").Scan(&exists)
+		checkPath := f.path
+		if checkPath != "" && checkPath != "/" {
+			if !strings.HasSuffix(checkPath, "/") {
+				checkPath += "/"
+			}
+			err = f.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path LIKE ?)", checkPath+"%").Scan(&exists)
+		} else {
+			// For root, check if any files exist
+			err = f.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata)").Scan(&exists)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -262,19 +327,31 @@ func (f *SQLiteFile) Readdir(count int) ([]os.FileInfo, error) {
 		return nil, errors.New("not a directory")
 	}
 
-	// Ensure path ends with / for directory queries
-	dirPath := f.path
-	if !strings.HasSuffix(dirPath, "/") {
-		dirPath += "/"
+	var rows *sql.Rows
+	var err error
+	var dirPath string
+
+	// Handle root directory specially
+	if f.path == "" || f.path == "/" {
+		// Root directory - list all files
+		query := `SELECT path, type FROM file_metadata`
+		rows, err = f.db.Query(query)
+		dirPath = ""
+	} else {
+		// Ensure path ends with / for directory queries
+		dirPath = f.path
+		if !strings.HasSuffix(dirPath, "/") {
+			dirPath += "/"
+		}
+		// Query to get files in the directory
+		query := `
+			SELECT path, type 
+			FROM file_metadata 
+			WHERE path LIKE ? AND path != ?
+		`
+		rows, err = f.db.Query(query, dirPath+"%", dirPath)
 	}
 
-	// Query to get files in the directory
-	query := `
-		SELECT path, type 
-		FROM file_metadata 
-		WHERE path LIKE ? AND path != ?
-	`
-	rows, err := f.db.Query(query, dirPath+"%", dirPath)
 	if err != nil {
 		return nil, err
 	}
@@ -290,21 +367,43 @@ func (f *SQLiteFile) Readdir(count int) ([]os.FileInfo, error) {
 			return nil, err
 		}
 
-		// Skip the directory itself
-		if path == dirPath {
-			continue
-		}
+		// For root directory, handle paths differently
+		var childName string
+		var childPath string
+		var isSubDir bool
 
-		// Extract the immediate child name
-		relPath := strings.TrimPrefix(path, dirPath)
-		parts := strings.SplitN(relPath, "/", 2)
-		childName := parts[0]
+		if f.path == "" || f.path == "/" {
+			// Root directory - extract first path component
+			parts := strings.SplitN(path, "/", 2)
+			childName = parts[0]
+			isSubDir = len(parts) > 1 || strings.HasSuffix(path, "/")
+			childPath = childName
+			if isSubDir && !strings.HasSuffix(childPath, "/") {
+				childPath += "/"
+			}
+		} else {
+			// Get directory path
+			dirPath := f.path
+			if !strings.HasSuffix(dirPath, "/") {
+				dirPath += "/"
+			}
 
-		// If this is a subdirectory entry, add a trailing slash
-		isSubDir := len(parts) > 1 || strings.HasSuffix(path, "/")
-		childPath := dirPath + childName
-		if isSubDir && !strings.HasSuffix(childPath, "/") {
-			childPath += "/"
+			// Skip the directory itself
+			if path == dirPath {
+				continue
+			}
+
+			// Extract the immediate child name
+			relPath := strings.TrimPrefix(path, dirPath)
+			parts := strings.SplitN(relPath, "/", 2)
+			childName = parts[0]
+
+			// If this is a subdirectory entry, add a trailing slash
+			isSubDir = len(parts) > 1 || strings.HasSuffix(path, "/")
+			childPath = dirPath + childName
+			if isSubDir && !strings.HasSuffix(childPath, "/") {
+				childPath += "/"
+			}
 		}
 
 		// Skip if we've already seen this immediate child
@@ -333,7 +432,12 @@ func (f *SQLiteFile) Readdir(count int) ([]os.FileInfo, error) {
 	// If no entries were found, check if the directory exists
 	if len(fileInfos) == 0 {
 		var exists bool
-		err := f.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path LIKE ?)", dirPath+"%").Scan(&exists)
+		if dirPath == "" {
+			// For root, check if any files exist
+			err = f.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata)").Scan(&exists)
+		} else {
+			err = f.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path LIKE ?)", dirPath+"%").Scan(&exists)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -355,7 +459,7 @@ func (f *SQLiteFile) Close() error {
 
 func (f *SQLiteFile) createFileInfo(path string) (os.FileInfo, error) {
 	// Determine if the path is a directory
-	isDir := strings.HasSuffix(path, "/")
+	isDir := f.isDir || path == "" || path == "/" || strings.HasSuffix(path, "/")
 
 	var size int64
 	var modTime time.Time = time.Now() // Use current time as default
@@ -388,23 +492,34 @@ func (f *SQLiteFile) createFileInfo(path string) (os.FileInfo, error) {
 	} else {
 		// For directories, check if they exist by looking for files with this prefix
 		var exists bool
-		dirPath := path
-		if !strings.HasSuffix(dirPath, "/") {
-			dirPath += "/"
-		}
 
-		err := f.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path LIKE ?)", dirPath+"%").Scan(&exists)
-		if err != nil {
-			return nil, err
-		}
-		if !exists {
-			// Also check if this exact path exists in metadata (empty directory)
-			err = f.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path = ?)", path).Scan(&exists)
+		if path == "" || path == "/" {
+			// Root directory - check if any files exist
+			err := f.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata)").Scan(&exists)
+			if err != nil {
+				return nil, err
+			}
+			// Root always exists even if empty
+			exists = true
+		} else {
+			dirPath := path
+			if !strings.HasSuffix(dirPath, "/") {
+				dirPath += "/"
+			}
+
+			err := f.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path LIKE ?)", dirPath+"%").Scan(&exists)
 			if err != nil {
 				return nil, err
 			}
 			if !exists {
-				return nil, os.ErrNotExist
+				// Also check if this exact path exists in metadata (empty directory)
+				err = f.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path = ?)", path).Scan(&exists)
+				if err != nil {
+					return nil, err
+				}
+				if !exists {
+					return nil, os.ErrNotExist
+				}
 			}
 		}
 	}
