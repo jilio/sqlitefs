@@ -1,3 +1,3 @@
 module github.com/jilio/sqlitefs
 
-go 1.21
+go 1.24

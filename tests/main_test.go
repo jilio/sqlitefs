@@ -65,7 +65,7 @@ func TestBasicFileOperations(t *testing.T) {
 		for i := range data {
 			data[i] = byte(i % 256)
 		}
-		
+
 		n, err := writer.Write(data)
 		if err != nil {
 			t.Fatalf("Failed to write large file: %v", err)
@@ -93,11 +93,11 @@ func TestBasicFileOperations(t *testing.T) {
 				break
 			}
 		}
-		
+
 		if totalRead != size {
 			t.Errorf("Expected to read %d bytes, got %d", size, totalRead)
 		}
-		
+
 		for i := 0; i < size; i++ {
 			if readData[i] != data[i] {
 				t.Errorf("Mismatch at byte %d: expected %d, got %d", i, data[i], readData[i])
@@ -522,12 +522,12 @@ func TestWriterOperations(t *testing.T) {
 	t.Run("MultipleClose", func(t *testing.T) {
 		writer := fs.NewWriter("multi_close.txt")
 		writer.Write([]byte("data"))
-		
+
 		err := writer.Close()
 		if err != nil {
 			t.Errorf("First close failed: %v", err)
 		}
-		
+
 		err = writer.Close()
 		if err != nil {
 			t.Errorf("Second close should succeed: %v", err)
@@ -541,7 +541,7 @@ func TestWriterOperations(t *testing.T) {
 		for i := range data {
 			data[i] = byte(i % 256)
 		}
-		
+
 		n, err := writer.Write(data)
 		if err != nil {
 			t.Fatalf("Failed to write: %v", err)
@@ -569,7 +569,7 @@ func TestErrorHandling(t *testing.T) {
 		if err == nil {
 			t.Fatal("Expected error")
 		}
-		
+
 		errStr := err.Error()
 		if errStr == "" {
 			t.Error("Error string should not be empty")
@@ -617,7 +617,7 @@ func TestReaddir(t *testing.T) {
 		defer file.Close()
 
 		sqlFile := file.(*sqlitefs.SQLiteFile)
-		
+
 		// Read first 2 entries
 		infos, err := sqlFile.Readdir(2)
 		if err != nil {
@@ -626,7 +626,7 @@ func TestReaddir(t *testing.T) {
 		if len(infos) != 2 {
 			t.Errorf("Expected 2 entries, got %d", len(infos))
 		}
-		
+
 		// Read remaining entries
 		infos, err = sqlFile.Readdir(-1)
 		if err != nil {
@@ -730,14 +730,14 @@ func TestGetTotalSize(t *testing.T) {
 			t.Error("Expected error opening non-existent file")
 		}
 	})
-	
+
 	t.Run("FileWithFragments", func(t *testing.T) {
 		// Create file with multiple fragments
 		data := make([]byte, 16384*2+100) // 2+ fragments
 		for i := range data {
 			data[i] = byte(i % 256)
 		}
-		
+
 		writer := fs.NewWriter("fragmented.txt")
 		writer.Write(data)
 		writer.Close()
@@ -755,10 +755,10 @@ func TestGetTotalSize(t *testing.T) {
 		if info.Size() != int64(len(data)) {
 			t.Errorf("Expected size %d, got %d", len(data), info.Size())
 		}
-		
+
 		// Also test Read to ensure getTotalSize is called
 		sqlFile := file.(*sqlitefs.SQLiteFile)
-		
+
 		// Seek to near end
 		sqlFile.Seek(int64(len(data)-10), io.SeekStart)
 		buf := make([]byte, 20)
@@ -853,7 +853,7 @@ func TestCreateFileInfo(t *testing.T) {
 			t.Error("Root should be a directory even on empty fs")
 		}
 	})
-	
+
 	t.Run("NonExistentDirectory", func(t *testing.T) {
 		// Try to open a non-existent directory - should fail
 		_, err := fs.Open("nonexistent/")
@@ -861,7 +861,7 @@ func TestCreateFileInfo(t *testing.T) {
 			t.Error("Expected error opening non-existent directory")
 		}
 	})
-	
+
 	t.Run("FileNameVariations", func(t *testing.T) {
 		// Test various file name patterns
 		testCases := []struct {
@@ -872,23 +872,23 @@ func TestCreateFileInfo(t *testing.T) {
 			{"deep/nested/path/", "path"},
 			{"file.txt", "file.txt"},
 		}
-		
+
 		for _, tc := range testCases {
 			writer := fs.NewWriter(tc.path)
 			writer.Write([]byte("test"))
 			writer.Close()
-			
+
 			file, err := fs.Open(tc.path)
 			if err != nil {
 				t.Fatalf("Failed to open %s: %v", tc.path, err)
 			}
 			defer file.Close()
-			
+
 			info, err := file.Stat()
 			if err != nil {
 				t.Fatalf("Failed to stat %s: %v", tc.path, err)
 			}
-			
+
 			if info.Name() != tc.name {
 				t.Errorf("For path %s, expected name %s, got %s", tc.path, tc.name, info.Name())
 			}
@@ -944,7 +944,7 @@ func TestReadEdgeCases(t *testing.T) {
 		for i := range data {
 			data[i] = byte(i % 256)
 		}
-		
+
 		writer := fs.NewWriter("exact.txt")
 		writer.Write(data)
 		writer.Close()
@@ -973,6 +973,50 @@ func TestReadEdgeCases(t *testing.T) {
 	})
 }
 
+// TestEmptyBufferRead tests that reading with empty buffer doesn't hang
+func TestEmptyBufferRead(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	fs, err := sqlitefs.NewSQLiteFS(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fs.Close()
+
+	// Create a file with content
+	writer := fs.NewWriter("test.txt")
+	writer.Write([]byte("test content"))
+	writer.Close()
+
+	// Open the file
+	file, err := fs.Open("test.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	// Read with empty buffer - should not hang
+	emptyBuf := make([]byte, 0)
+	n, err := file.Read(emptyBuf)
+	if n != 0 {
+		t.Errorf("Expected 0 bytes read with empty buffer, got %d", n)
+	}
+	if err != nil {
+		t.Errorf("Expected no error with empty buffer read, got %v", err)
+	}
+
+	// Verify we can still read normally after
+	normalBuf := make([]byte, 4)
+	n, err = file.Read(normalBuf)
+	if n != 4 {
+		t.Errorf("Expected 4 bytes read, got %d", n)
+	}
+	if string(normalBuf) != "test" {
+		t.Errorf("Expected 'test', got '%s'", string(normalBuf))
+	}
+}
+
 // TestEdgeCases tests various edge cases and error conditions
 func TestEdgeCases(t *testing.T) {
 	db := setupTestDB(t)
@@ -983,7 +1027,6 @@ func TestEdgeCases(t *testing.T) {
 		t.Fatalf("Failed to create SQLiteFS: %v", err)
 	}
 	defer fs.Close()
-
 
 	t.Run("SeekBeyondFileSize", func(t *testing.T) {
 		writer := fs.NewWriter("seektest.txt")
@@ -997,7 +1040,7 @@ func TestEdgeCases(t *testing.T) {
 		defer file.Close()
 
 		sqlFile := file.(*sqlitefs.SQLiteFile)
-		
+
 		// Seek beyond file size
 		pos, err := sqlFile.Seek(1000, io.SeekStart)
 		if err != nil {
@@ -1030,7 +1073,7 @@ func TestEdgeCases(t *testing.T) {
 		defer file.Close()
 
 		sqlFile := file.(*sqlitefs.SQLiteFile)
-		
+
 		// Try to seek to negative position
 		_, err = sqlFile.Seek(-10, io.SeekStart)
 		if err == nil {
@@ -1103,20 +1146,20 @@ func TestEdgeCases(t *testing.T) {
 			t.Errorf("Expected '%s', got '%s'", expected, string(data))
 		}
 	})
-	
+
 	t.Run("ReadPartialFragment", func(t *testing.T) {
 		// Test reading partial data from a fragment
 		data := []byte("This is test data for partial reading")
 		writer := fs.NewWriter("partial.txt")
 		writer.Write(data)
 		writer.Close()
-		
+
 		file, err := fs.Open("partial.txt")
 		if err != nil {
 			t.Fatalf("Failed to open file: %v", err)
 		}
 		defer file.Close()
-		
+
 		// Read only first 10 bytes
 		buf := make([]byte, 10)
 		n, err := file.Read(buf)
@@ -1129,7 +1172,7 @@ func TestEdgeCases(t *testing.T) {
 		if string(buf) != "This is te" {
 			t.Errorf("Expected 'This is te', got '%s'", string(buf))
 		}
-		
+
 		// Continue reading
 		n, err = file.Read(buf)
 		if err != nil {
@@ -1142,21 +1185,21 @@ func TestEdgeCases(t *testing.T) {
 			t.Errorf("Expected 'st data fo', got '%s'", string(buf))
 		}
 	})
-	
+
 	t.Run("SeekVariations", func(t *testing.T) {
 		data := []byte("0123456789ABCDEFGHIJ")
 		writer := fs.NewWriter("seekvar.txt")
 		writer.Write(data)
 		writer.Close()
-		
+
 		file, err := fs.Open("seekvar.txt")
 		if err != nil {
 			t.Fatalf("Failed to open file: %v", err)
 		}
 		defer file.Close()
-		
+
 		sqlFile := file.(*sqlitefs.SQLiteFile)
-		
+
 		// Test SeekEnd
 		pos, err := sqlFile.Seek(-5, io.SeekEnd)
 		if err != nil {
@@ -1165,7 +1208,7 @@ func TestEdgeCases(t *testing.T) {
 		if pos != int64(len(data)-5) {
 			t.Errorf("Expected position %d, got %d", len(data)-5, pos)
 		}
-		
+
 		buf := make([]byte, 5)
 		n, err := file.Read(buf)
 		if err != nil && err != io.EOF {
@@ -1177,7 +1220,7 @@ func TestEdgeCases(t *testing.T) {
 		if string(buf) != "FGHIJ" {
 			t.Errorf("Expected 'FGHIJ', got '%s'", string(buf))
 		}
-		
+
 		// Test SeekCurrent
 		sqlFile.Seek(5, io.SeekStart)
 		pos, err = sqlFile.Seek(3, io.SeekCurrent)
@@ -1189,4 +1232,3 @@ func TestEdgeCases(t *testing.T) {
 		}
 	})
 }
-

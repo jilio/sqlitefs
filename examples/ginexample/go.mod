@@ -1,6 +1,6 @@
 module ginexample
 
-go 1.22.0
+go 1.24
 
 require (
 	github.com/gin-gonic/gin v1.9.1

@@ -34,11 +34,12 @@ func (d *dirEntry) Info() (fs.FileInfo, error) {
 
 // SQLiteFile implements the fs.File and fs.ReadDirFile interfaces.
 type SQLiteFile struct {
-	db     *sql.DB
-	path   string
-	offset int64 // current offset for read operations
-	size   int64 // total file size
-	isDir  bool  // whether this is a directory
+	db       *sql.DB
+	path     string
+	offset   int64  // current offset for read operations
+	size     int64  // total file size
+	isDir    bool   // whether this is a directory
+	mimeType string // MIME type of the file (optional)
 }
 
 // NewSQLiteFile creates a new SQLiteFile instance for the given path.
@@ -53,6 +54,16 @@ func NewSQLiteFile(db *sql.DB, path string) (*SQLiteFile, error) {
 		db:    db,
 		path:  path,
 		isDir: isDir,
+	}
+
+	// Load MIME type if it's a file
+	if !isDir && path != "" {
+		var mimeType sql.NullString
+		err := db.QueryRow("SELECT mime_type FROM file_metadata WHERE path = ? AND type = 'file'", path).Scan(&mimeType)
+		if err == nil && mimeType.Valid {
+			file.mimeType = mimeType.String
+		}
+		// Ignore error as MIME type is optional
 	}
 
 	// Initialize file size if it's not a directory
@@ -71,6 +82,11 @@ func (f *SQLiteFile) Read(p []byte) (int, error) {
 	// Return EOF for directory reads
 	if f.isDir {
 		return 0, io.EOF
+	}
+
+	// Handle empty buffer - return 0 bytes read, no error
+	if len(p) == 0 {
+		return 0, nil
 	}
 
 	// Return EOF if we're at the end of the file
@@ -457,6 +473,11 @@ func (f *SQLiteFile) Close() error {
 	return nil
 }
 
+// MimeType returns the MIME type of the file, or empty string if not available or if it's a directory
+func (f *SQLiteFile) MimeType() string {
+	return f.mimeType
+}
+
 func (f *SQLiteFile) createFileInfo(path string) (os.FileInfo, error) {
 	// Determine if the path is a directory
 	isDir := f.isDir || path == "" || path == "/" || strings.HasSuffix(path, "/")
@@ -465,29 +486,25 @@ func (f *SQLiteFile) createFileInfo(path string) (os.FileInfo, error) {
 	var modTime time.Time = time.Now() // Use current time as default
 
 	if !isDir {
-		// Get file size
-		query := `
-			SELECT SUM(LENGTH(fragment)) 
-			FROM file_fragments 
-			WHERE file_id = (SELECT id FROM file_metadata WHERE path = ?)
-		`
-		err := f.db.QueryRow(query, path).Scan(&size)
+		// First check if the file exists
+		var fileID sql.NullInt64
+		err := f.db.QueryRow("SELECT id FROM file_metadata WHERE path = ? AND type = 'file'", path).Scan(&fileID)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				// If no fragments found, check if the file exists in metadata
-				var exists bool
-				err = f.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path = ?)", path).Scan(&exists)
-				if err != nil {
-					return nil, err
-				}
-				if !exists {
-					return nil, os.ErrNotExist
-				}
-				// File exists but has no content
-				size = 0
-			} else {
-				return nil, err
+				return nil, os.ErrNotExist
 			}
+			return nil, err
+		}
+
+		// Get file size
+		query := `
+			SELECT COALESCE(SUM(LENGTH(fragment)), 0) 
+			FROM file_fragments 
+			WHERE file_id = ?
+		`
+		err = f.db.QueryRow(query, fileID.Int64).Scan(&size)
+		if err != nil {
+			return nil, err
 		}
 	} else {
 		// For directories, check if they exist by looking for files with this prefix
