@@ -52,9 +52,8 @@ func TestDatabaseErrorScenarios(t *testing.T) {
 	})
 }
 
-// TestReadErrorPathsDisabled tests error scenarios in Read method
-func TestReadErrorPathsDisabled(t *testing.T) {
-	t.Skip("Skipping due to hanging issue with nil buffer read")
+// TestReadNilBufferScenario tests error scenarios in Read method including nil buffer handling
+func TestReadNilBufferScenario(t *testing.T) {
 	db, err := sql.Open("sqlite", "file::memory:?cache=shared")
 	if err != nil {
 		t.Fatal(err)
