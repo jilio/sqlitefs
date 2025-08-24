@@ -21,7 +21,7 @@ func TestGetTotalSizeFileExistsNoFragments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Directly insert file metadata without fragments
 	_, err = db.Exec("INSERT INTO file_metadata (path, type) VALUES (?, ?)", "empty.txt", "file")
 	if err != nil {
@@ -39,7 +39,7 @@ func TestGetTotalSizeFileExistsNoFragments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// File exists but has no fragments, so size should be 0
 	if info.Size() != 0 {
 		t.Fatalf("expected size 0 for file with no fragments, got %d", info.Size())
@@ -58,7 +58,7 @@ func TestGetTotalSizeNonExistentFileOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Try to open a file that doesn't exist - should fail at Open
 	_, err = fs.Open("nonexistent.txt")
 	if err == nil {
@@ -77,7 +77,7 @@ func TestGetTotalSizeQueryError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create a file
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("content"))

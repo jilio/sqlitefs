@@ -36,7 +36,9 @@ func TestReaddirErrorConditions(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+		if dirFile, ok := f.(interface {
+			Readdir(int) ([]os.FileInfo, error)
+		}); ok {
 			_, err = dirFile.Readdir(0)
 			if err == nil || err.Error() != "not a directory" {
 				t.Fatalf("expected 'not a directory', got %v", err)
@@ -61,7 +63,9 @@ func TestReaddirErrorConditions(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+		if dirFile, ok := f.(interface {
+			Readdir(int) ([]os.FileInfo, error)
+		}); ok {
 			infos, err := dirFile.Readdir(0)
 			if err != nil {
 				t.Fatal(err)
@@ -87,7 +91,9 @@ func TestReaddirErrorConditions(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+		if dirFile, ok := f.(interface {
+			Readdir(int) ([]os.FileInfo, error)
+		}); ok {
 			// Read only 2 entries
 			infos, err := dirFile.Readdir(2)
 			if err != nil && err != io.EOF {
@@ -130,7 +136,9 @@ func TestReaddirErrorConditions(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+		if dirFile, ok := f.(interface {
+			Readdir(int) ([]os.FileInfo, error)
+		}); ok {
 			infos, err := dirFile.Readdir(0)
 			if err != nil {
 				t.Fatal(err)
@@ -169,7 +177,7 @@ func TestReadDirCleanName(t *testing.T) {
 	w1.Close()
 
 	// Manually insert a directory with trailing slash
-	_, err = db.Exec("INSERT OR REPLACE INTO file_metadata (path, type) VALUES (?, ?)", 
+	_, err = db.Exec("INSERT OR REPLACE INTO file_metadata (path, type) VALUES (?, ?)",
 		"cleandir/subdir/", "dir")
 	if err != nil {
 		t.Fatal(err)
@@ -180,7 +188,9 @@ func TestReadDirCleanName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		entries, err := dirFile.ReadDir(0)
 		if err != nil {
 			t.Fatal(err)
@@ -274,7 +284,7 @@ func TestGetTotalSizeCornerCases(t *testing.T) {
 	// Test file with metadata but no fragments
 	t.Run("MetadataNoFragments", func(t *testing.T) {
 		// Insert file metadata directly
-		_, err = db.Exec("INSERT INTO file_metadata (path, type) VALUES (?, ?)", 
+		_, err = db.Exec("INSERT INTO file_metadata (path, type) VALUES (?, ?)",
 			"metadata_only.txt", "file")
 		if err != nil {
 			t.Fatal(err)

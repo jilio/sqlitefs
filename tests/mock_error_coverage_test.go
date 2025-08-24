@@ -161,7 +161,7 @@ func TestReadMockErrorPaths(t *testing.T) {
 		// Set up file metadata
 		driver.SetData("SELECT id FROM file_metadata", [][]interface{}{{int64(1)}})
 		driver.SetData("SELECT COUNT", [][]interface{}{{1, 100}}) // 1 fragment, 100 bytes
-		
+
 		// Make SUBSTR query return ErrNoRows
 		// This tests line 132: return 0, io.EOF
 		driver.SetError("SELECT SUBSTR", sql.ErrNoRows)
@@ -197,7 +197,7 @@ func TestReadMockErrorPaths(t *testing.T) {
 		// Set up file metadata
 		driver.SetData("SELECT id FROM file_metadata", [][]interface{}{{int64(1)}})
 		driver.SetData("SELECT COUNT", [][]interface{}{{2, 100}}) // 2 fragments
-		
+
 		f, err := fs.Open("test.txt")
 		if err != nil {
 			t.Fatal(err)
@@ -242,7 +242,7 @@ func TestReadMockErrorPaths(t *testing.T) {
 		// Set up file metadata
 		driver.SetData("SELECT id FROM file_metadata", [][]interface{}{{int64(1)}})
 		driver.SetData("SELECT COUNT", [][]interface{}{{1, 100}})
-		
+
 		// Make SUBSTR query return generic error
 		// This tests line 134: return bytesReadTotal, err
 		driver.SetError("SELECT SUBSTR", errors.New("query failed"))
@@ -279,7 +279,7 @@ func TestSeekErrorPaths(t *testing.T) {
 
 		// Set up file metadata
 		driver.SetData("SELECT id FROM file_metadata", [][]interface{}{{int64(1)}})
-		
+
 		f, err := fs.Open("test.txt")
 		if err != nil {
 			t.Fatal(err)
@@ -317,14 +317,16 @@ func TestReadDirMockErrorPaths(t *testing.T) {
 
 		// Set up as file, not directory
 		driver.SetData("SELECT type FROM file_metadata", [][]interface{}{{"file"}})
-		
+
 		f, err := fs.Open("test.txt")
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// This tests lines 263-265: return nil, errors.New("not a directory")
-		if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+		if dirFile, ok := f.(interface {
+			ReadDir(int) ([]os.DirEntry, error)
+		}); ok {
 			_, err = dirFile.ReadDir(0)
 			if err == nil || err.Error() != "not a directory" {
 				t.Fatalf("expected 'not a directory', got %v", err)
@@ -348,17 +350,19 @@ func TestReadDirMockErrorPaths(t *testing.T) {
 		// Set up as directory
 		driver.SetData("SELECT type FROM file_metadata", [][]interface{}{{"dir"}})
 		driver.SetData("SELECT COUNT", [][]interface{}{{int64(1)}})
-		
+
 		// Make the main query return data that causes scan error
 		// This tests lines 301-303
 		driver.SetError("SELECT path, type FROM file_metadata", errors.New("scan error"))
-		
+
 		f, err := fs.Open("dir")
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+		if dirFile, ok := f.(interface {
+			ReadDir(int) ([]os.DirEntry, error)
+		}); ok {
 			_, err = dirFile.ReadDir(0)
 			if err == nil || err.Error() != "scan error" {
 				t.Fatalf("expected scan error, got %v", err)
@@ -386,11 +390,11 @@ func TestCreateFileInfoErrorPaths(t *testing.T) {
 
 		// Set up to trigger directory check
 		driver.SetData("SELECT type FROM file_metadata", [][]interface{}{})
-		
+
 		// Make EXISTS query for directory fail
 		// This tests lines 605-607
 		driver.SetError("SELECT EXISTS", errors.New("exists query failed"))
-		
+
 		f, err := fs.Open("")
 		if err != nil {
 			t.Fatal(err)
@@ -418,7 +422,7 @@ func TestCreateFileInfoErrorPaths(t *testing.T) {
 		// Set up to check for directory that doesn't exist
 		driver.SetData("SELECT type FROM file_metadata", [][]interface{}{})
 		driver.SetData("SELECT EXISTS", [][]interface{}{{false}})
-		
+
 		// This tests lines 614-616: return nil, os.ErrNotExist
 		f, err := fs.Open("")
 		if err != nil {
@@ -446,11 +450,11 @@ func TestCreateFileInfoErrorPaths(t *testing.T) {
 
 		// Set up as file
 		driver.SetData("SELECT type FROM file_metadata", [][]interface{}{{"file"}})
-		
+
 		// Make file ID query fail
 		// This tests lines 593-595
 		driver.SetError("SELECT id FROM file_metadata", errors.New("file query failed"))
-		
+
 		f, err := fs.Open("test.txt")
 		if err != nil {
 			t.Fatal(err)
@@ -483,7 +487,7 @@ func TestOpenErrorPaths(t *testing.T) {
 		// Make the file exists query fail
 		// This tests lines 782-784
 		driver.SetError("SELECT COUNT", errors.New("count query failed"))
-		
+
 		_, err = fs.Open("test.txt")
 		if err == nil || err.Error() != "count query failed" {
 			t.Fatalf("expected count query failed, got %v", err)
@@ -505,11 +509,11 @@ func TestOpenErrorPaths(t *testing.T) {
 
 		// First query says file doesn't exist
 		driver.SetData("SELECT COUNT", [][]interface{}{{int64(0)}})
-		
+
 		// Make directory exists query fail
 		// This tests lines 795-797
 		driver.SetError("SELECT EXISTS", errors.New("exists query failed"))
-		
+
 		_, err = fs.Open("test")
 		if err == nil || err.Error() != "exists query failed" {
 			t.Fatalf("expected exists query failed, got %v", err)
@@ -537,7 +541,7 @@ func TestWriteFragmentErrorPaths(t *testing.T) {
 		// Make the transaction fail
 		// This tests lines 886-888
 		driver.SetError("BEGIN", errors.New("transaction failed"))
-		
+
 		w := fs.NewWriter("test.txt")
 		_, err = w.Write([]byte("data"))
 		if err == nil {
@@ -563,7 +567,7 @@ func TestWriteFragmentErrorPaths(t *testing.T) {
 
 		// Make the INSERT fail
 		driver.SetError("INSERT INTO file_fragments", errors.New("insert failed"))
-		
+
 		w := fs.NewWriter("test.txt")
 		_, err = w.Write([]byte("data"))
 		if err == nil {

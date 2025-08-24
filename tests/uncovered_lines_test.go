@@ -146,7 +146,9 @@ func TestReadDirLinesCoverage(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+		if dirFile, ok := f.(interface {
+			ReadDir(int) ([]os.DirEntry, error)
+		}); ok {
 			entries, err := dirFile.ReadDir(0)
 			if err != nil {
 				t.Fatal(err)
@@ -175,7 +177,9 @@ func TestReadDirLinesCoverage(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+		if dirFile, ok := f.(interface {
+			ReadDir(int) ([]os.DirEntry, error)
+		}); ok {
 			_, err = dirFile.ReadDir(0)
 			// May or may not error depending on implementation
 			_ = err

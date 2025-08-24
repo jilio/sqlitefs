@@ -22,7 +22,7 @@ func TestGetTotalSizeEdgeCases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Test 1: File exists in metadata but no fragments (covers lines 651-663 in getTotalSize)
 	_, err = db.Exec("INSERT INTO file_metadata (path, type) VALUES (?, ?)", "empty.txt", "file")
 	if err != nil {
@@ -38,7 +38,7 @@ func TestGetTotalSizeEdgeCases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	if info.Size() != 0 {
 		t.Fatalf("expected size 0 for file with no fragments, got %d", info.Size())
 	}
@@ -56,7 +56,7 @@ func TestReadDirDatabaseErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create a directory entry with subdirectory
 	_, err = db.Exec("INSERT INTO file_metadata (path, type) VALUES (?, ?)", "parent/child/file.txt", "file")
 	if err != nil {
@@ -76,7 +76,9 @@ func TestReadDirDatabaseErrors(t *testing.T) {
 	}
 
 	// Try to read directory - may encounter the corrupt entry
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		_, _ = dirFile.ReadDir(0)
 		// Don't check error as behavior may vary, just exercise the code path
 	}
@@ -94,14 +96,14 @@ func TestReaddirSubdirectoryPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create nested structure
 	paths := []string{
 		"root/sub1/file1.txt",
 		"root/sub1/sub2/file2.txt",
 		"root/sub1/sub2/sub3/file3.txt",
 	}
-	
+
 	for _, path := range paths {
 		w := fs.NewWriter(path)
 		w.Write([]byte("content"))
@@ -114,7 +116,9 @@ func TestReaddirSubdirectoryPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if readdirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if readdirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		infos, err := readdirFile.Readdir(0)
 		if err != nil {
 			t.Fatal(err)
@@ -158,7 +162,7 @@ func TestReadContinueOnZeroBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create a file with multiple fragments
 	w := fs.NewWriter("test.txt")
 	// Write enough to create multiple fragments
@@ -205,7 +209,7 @@ func TestOpenErrorPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Close DB to force query error
 	db.Close()
 
@@ -227,14 +231,14 @@ func TestWriteFragmentTransactionFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create a file
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("data"))
-	
+
 	// Close database before closing writer - should cause error on Close
 	db.Close()
-	
+
 	err = w.Close()
 	if err == nil {
 		t.Fatal("expected error when database is closed during write")
@@ -253,7 +257,7 @@ func TestReadEOFWhenNoRowsAndNoBytesRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create file with single fragment
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("test"))
@@ -271,7 +275,7 @@ func TestReadEOFWhenNoRowsAndNoBytesRead(t *testing.T) {
 		t.Fatalf("expected 4 bytes, got %d", n)
 	}
 
-	// Now at EOF, next read should return EOF immediately  
+	// Now at EOF, next read should return EOF immediately
 	n, err = f.Read(buf)
 	if err != io.EOF {
 		t.Fatalf("expected io.EOF, got %v", err)
@@ -293,7 +297,7 @@ func TestReadDirCleanNameWithSlash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create entries including one with trailing slash
 	_, err = db.Exec("INSERT INTO file_metadata (path, type) VALUES (?, ?)", "dir/subdir1/", "dir")
 	if err != nil {
@@ -309,12 +313,14 @@ func TestReadDirCleanNameWithSlash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		entries, err := dirFile.ReadDir(0)
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		// Check that names are cleaned properly
 		for _, entry := range entries {
 			name := entry.Name()

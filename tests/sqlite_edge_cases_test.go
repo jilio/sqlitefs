@@ -94,7 +94,9 @@ func TestReaddirNotADirectoryReal(t *testing.T) {
 	}
 
 	// Try to call Readdir on a regular file (lines 315-317)
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		_, err = dirFile.Readdir(0)
 		if err == nil {
 			t.Fatal("expected error when calling Readdir on file")
@@ -142,7 +144,9 @@ func TestReaddirCleanNameSkip(t *testing.T) {
 	}
 
 	// Readdir should skip entries with empty clean names (lines 324-326, 412-413)
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		infos, err := dirFile.Readdir(0)
 		if err != nil && err != io.EOF {
 			t.Fatal(err)
@@ -200,7 +204,9 @@ func TestReadDirCleanNameSkip(t *testing.T) {
 	}
 
 	// ReadDir should skip entries with empty clean names (lines 254-255)
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		entries, err := dirFile.ReadDir(0)
 		if err != nil && err != io.EOF {
 			t.Fatal(err)
@@ -257,7 +263,9 @@ func TestReaddirCorruptedRows(t *testing.T) {
 	}
 
 	// Readdir should handle the scan error (lines 332-334)
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		_, err = dirFile.Readdir(0)
 		// Should either error or handle gracefully
 		if err != nil {
@@ -299,7 +307,9 @@ func TestReaddirElseCase(t *testing.T) {
 	}
 
 	// Readdir should handle unknown type (lines 458-460, 461-463)
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		infos, err := dirFile.Readdir(0)
 		if err != nil && err != io.EOF {
 			// Error handling unknown type is ok
@@ -347,7 +357,9 @@ func TestDatabaseClosedErrors(t *testing.T) {
 	// Now try various operations that should fail
 
 	// ReadDir query error (lines 228-230, 386-388)
-	if dirFile, ok := f1.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f1.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		_, err = dirFile.ReadDir(0)
 		if err == nil {
 			t.Fatal("expected error when database is closed")
@@ -355,7 +367,9 @@ func TestDatabaseClosedErrors(t *testing.T) {
 	}
 
 	// Readdir query error (lines 280-282, 376-377)
-	if dirFile, ok := f1.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f1.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		_, err = dirFile.Readdir(0)
 		if err == nil {
 			t.Fatal("expected error when database is closed")

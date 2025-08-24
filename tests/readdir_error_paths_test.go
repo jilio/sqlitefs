@@ -72,7 +72,7 @@ func TestReadEmptyFragmentAtBoundary(t *testing.T) {
 	for i := range content {
 		content[i] = byte(i % 256)
 	}
-	
+
 	w := fs.NewWriter("boundary.txt")
 	w.Write(content)
 	w.Close()
@@ -83,7 +83,7 @@ func TestReadEmptyFragmentAtBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Add empty fragment at index 1
 	_, err = db.Exec("INSERT INTO file_fragments (file_id, fragment_index, fragment) VALUES (?, ?, ?)",
 		fileID, 1, []byte{})
@@ -141,7 +141,9 @@ func TestReaddirVariousErrorPaths(t *testing.T) {
 		}
 
 		// Try Readdir on file (lines 315-317)
-		if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+		if dirFile, ok := f.(interface {
+			Readdir(int) ([]os.FileInfo, error)
+		}); ok {
 			_, err = dirFile.Readdir(0)
 			if err == nil || err.Error() != "not a directory" {
 				t.Fatalf("expected 'not a directory', got %v", err)
@@ -156,7 +158,7 @@ func TestReaddirVariousErrorPaths(t *testing.T) {
 		w.Close()
 
 		// Manually insert problematic path
-		_, err = db.Exec("INSERT OR IGNORE INTO file_metadata (path, type) VALUES (?, ?)", 
+		_, err = db.Exec("INSERT OR IGNORE INTO file_metadata (path, type) VALUES (?, ?)",
 			"cleandir//", "dir")
 		if err != nil {
 			t.Fatal(err)
@@ -168,7 +170,9 @@ func TestReaddirVariousErrorPaths(t *testing.T) {
 		}
 
 		// Readdir should handle clean name issues (lines 324-326)
-		if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+		if dirFile, ok := f.(interface {
+			Readdir(int) ([]os.FileInfo, error)
+		}); ok {
 			infos, err := dirFile.Readdir(0)
 			if err != nil && err != io.EOF {
 				// Some error is ok, as long as it handles the bad path
@@ -212,7 +216,9 @@ func TestReadDirVariousErrorPaths(t *testing.T) {
 		db.Close()
 
 		// ReadDir should fail (lines 228-230)
-		if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+		if dirFile, ok := f.(interface {
+			ReadDir(int) ([]os.DirEntry, error)
+		}); ok {
 			_, err = dirFile.ReadDir(0)
 			if err == nil {
 				t.Fatal("expected error when database is closed")
@@ -255,7 +261,9 @@ func TestCreateFileInfoSubdirError(t *testing.T) {
 	}
 
 	// ReadDir should handle corrupted subdirectory gracefully
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		entries, err := dirFile.ReadDir(0)
 		if err != nil && err != io.EOF {
 			// Error is acceptable
@@ -287,7 +295,7 @@ func TestReadDirCleanNameEmpty(t *testing.T) {
 	w.Close()
 
 	// Manually insert path that results in empty clean name
-	_, err = db.Exec("INSERT OR IGNORE INTO file_metadata (path, type) VALUES (?, ?)", 
+	_, err = db.Exec("INSERT OR IGNORE INTO file_metadata (path, type) VALUES (?, ?)",
 		"emptyname/", "dir")
 	if err != nil {
 		t.Fatal(err)
@@ -299,7 +307,9 @@ func TestReadDirCleanNameEmpty(t *testing.T) {
 	}
 
 	// ReadDir should skip entries with empty clean names (lines 254-255)
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		entries, err := dirFile.ReadDir(0)
 		if err != nil && err != io.EOF {
 			// Error is acceptable
@@ -344,7 +354,9 @@ func TestReaddirQueryRowsError(t *testing.T) {
 	}
 
 	// Readdir should handle scan error gracefully (lines 332-334)
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		_, err = dirFile.Readdir(0)
 		// Should get an error or handle gracefully
 		if err == nil {
@@ -383,7 +395,9 @@ func TestReadDirSubdirQueryError(t *testing.T) {
 	}
 
 	// ReadDir should handle missing subdirectory metadata
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		entries, err := dirFile.ReadDir(0)
 		if err != nil && err != io.EOF {
 			// Error is acceptable
@@ -420,7 +434,9 @@ func TestReaddirRowsError(t *testing.T) {
 	db.Close()
 
 	// Readdir should fail with query error (lines 280-282)
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		_, err = dirFile.Readdir(0)
 		if err == nil {
 			t.Fatal("expected error when database is closed")
@@ -454,7 +470,9 @@ func TestReadDirRowsError(t *testing.T) {
 	db.Close()
 
 	// ReadDir should fail with query error (lines 386-388)
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		_, err = dirFile.ReadDir(0)
 		if err == nil {
 			t.Fatal("expected error when database is closed")
@@ -492,7 +510,9 @@ func TestReaddirSubdirQueryError(t *testing.T) {
 	}
 
 	// Readdir should handle missing subdirectory
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		entries, err := dirFile.Readdir(0)
 		if err != nil && err != io.EOF {
 			// Error is acceptable
@@ -522,7 +542,7 @@ func TestReaddirCleanNameContinue(t *testing.T) {
 	w.Close()
 
 	// Insert path that will have empty clean name
-	_, err = db.Exec("INSERT OR IGNORE INTO file_metadata (path, type) VALUES (?, ?)", 
+	_, err = db.Exec("INSERT OR IGNORE INTO file_metadata (path, type) VALUES (?, ?)",
 		"skipdir/", "dir")
 	if err != nil {
 		t.Fatal(err)
@@ -534,7 +554,9 @@ func TestReaddirCleanNameContinue(t *testing.T) {
 	}
 
 	// Readdir should skip entries with empty/slash clean names (lines 412-413)
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		infos, err := dirFile.Readdir(0)
 		if err != nil && err != io.EOF {
 			// Error is acceptable
@@ -583,7 +605,9 @@ func TestReaddirCreateFileInfoError(t *testing.T) {
 	}
 
 	// Readdir should handle createFileInfo error (lines 437-439)
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		infos, err := dirFile.Readdir(0)
 		// Should either error or skip the bad entry
 		if err != nil && err != io.EOF {
@@ -630,7 +654,9 @@ func TestReaddirElsePathErrors(t *testing.T) {
 	}
 
 	// Readdir should handle unknown types (lines 458-460)
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		infos, err := dirFile.Readdir(0)
 		if err != nil && err != io.EOF {
 			// Error handling unknown type is ok

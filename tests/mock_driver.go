@@ -131,9 +131,9 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 	s.conn.driver.mu.RUnlock()
 
 	// Handle CREATE TABLE, CREATE INDEX, ALTER TABLE
-	if strings.Contains(s.query, "CREATE TABLE") || 
-	   strings.Contains(s.query, "CREATE INDEX") ||
-	   strings.Contains(s.query, "ALTER TABLE") {
+	if strings.Contains(s.query, "CREATE TABLE") ||
+		strings.Contains(s.query, "CREATE INDEX") ||
+		strings.Contains(s.query, "ALTER TABLE") {
 		return &mockResult{}, nil
 	}
 
@@ -158,14 +158,14 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 func (s *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
 	s.conn.driver.mu.RLock()
 	defer s.conn.driver.mu.RUnlock()
-	
+
 	// Check for errors first
 	for pattern, err := range s.conn.driver.errorRules {
 		if strings.Contains(s.query, pattern) {
 			return nil, err
 		}
 	}
-	
+
 	// Check for mock data - this takes priority over defaults
 	for pattern, rows := range s.conn.driver.data {
 		if strings.Contains(s.query, pattern) {
@@ -265,6 +265,31 @@ func (s *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
 		return &mockRows{
 			columns: []string{"type"},
 			rows:    [][]driver.Value{{"dir"}},
+		}, nil
+	}
+
+	// Handle id queries for createFileInfo
+	if strings.Contains(s.query, "SELECT id FROM file_metadata WHERE path = ? AND type = 'file'") {
+		// Return a file ID for test.txt
+		if len(args) > 0 && args[0] == "test.txt" {
+			return &mockRows{
+				columns: []string{"id"},
+				rows:    [][]driver.Value{{int64(1)}},
+			}, nil
+		}
+		// File doesn't exist
+		return &mockRows{
+			columns: []string{"id"},
+			rows:    [][]driver.Value{},
+		}, nil
+	}
+
+	// Handle SUM(LENGTH(fragment)) queries for file size in createFileInfo
+	if strings.Contains(s.query, "SELECT COALESCE(SUM(LENGTH(fragment)), 0)") {
+		// Return size of 5 bytes (for "hello")
+		return &mockRows{
+			columns: []string{"size"},
+			rows:    [][]driver.Value{{int64(5)}},
 		}, nil
 	}
 

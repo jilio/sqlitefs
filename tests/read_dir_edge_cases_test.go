@@ -22,7 +22,7 @@ func TestGetTotalSizeNoFragments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create a file with content
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("content"))
@@ -44,7 +44,7 @@ func TestGetTotalSizeNoFragments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	if info.Size() != 0 {
 		t.Fatalf("expected size 0, got %d", info.Size())
 	}
@@ -62,7 +62,7 @@ func TestReadEOFConditions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create a file
 	content := []byte("test")
 	w := fs.NewWriter("test.txt")
@@ -106,7 +106,7 @@ func TestReadDirOnFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create a file
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("content"))
@@ -118,7 +118,9 @@ func TestReadDirOnFile(t *testing.T) {
 	}
 
 	// Try to ReadDir on a file
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		_, err = dirFile.ReadDir(0)
 		if err == nil {
 			t.Fatal("expected error when calling ReadDir on file")
@@ -141,7 +143,7 @@ func TestReaddirOnFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create a file
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("content"))
@@ -153,7 +155,9 @@ func TestReaddirOnFile(t *testing.T) {
 	}
 
 	// Try to Readdir on a file
-	if readdirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if readdirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		_, err = readdirFile.Readdir(0)
 		if err == nil {
 			t.Fatal("expected error when calling Readdir on file")
@@ -176,7 +180,7 @@ func TestReadDirPathWithoutSlash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create files in directory (path without trailing slash)
 	w1 := fs.NewWriter("mydir/file1.txt")
 	w1.Write([]byte("content1"))
@@ -193,7 +197,9 @@ func TestReadDirPathWithoutSlash(t *testing.T) {
 	}
 
 	// ReadDir should normalize path
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		entries, err := dirFile.ReadDir(0)
 		if err != nil {
 			t.Fatal(err)
@@ -236,7 +242,7 @@ func TestReadZeroBytesFragment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create file with content
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("hello"))
@@ -248,9 +254,9 @@ func TestReadZeroBytesFragment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Insert empty fragment at index 1
-	_, err = db.Exec("INSERT INTO file_fragments (file_id, fragment_index, fragment) VALUES (?, ?, ?)", 
+	_, err = db.Exec("INSERT INTO file_fragments (file_id, fragment_index, fragment) VALUES (?, ?, ?)",
 		fileID, 1, []byte{})
 	if err != nil {
 		t.Fatal(err)
@@ -288,7 +294,7 @@ func TestReadNoFragments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create file
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("content"))
@@ -327,7 +333,7 @@ func TestSeekEndError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create file
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("content"))
@@ -361,7 +367,7 @@ func TestOpenDatabaseClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create file first
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("content"))
@@ -388,7 +394,7 @@ func TestWriteFragmentError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Write to create the file
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("initial"))
@@ -421,14 +427,14 @@ func TestReadDirWithSubdirAndTrailingSlash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create nested structure
 	w1 := fs.NewWriter("parent/child/file.txt")
 	w1.Write([]byte("content"))
 	w1.Close()
 
 	// Manually insert dir with trailing slash (edge case)
-	_, err = db.Exec("INSERT OR REPLACE INTO file_metadata (path, type) VALUES (?, ?)", 
+	_, err = db.Exec("INSERT OR REPLACE INTO file_metadata (path, type) VALUES (?, ?)",
 		"parent/subdir/", "dir")
 	if err != nil {
 		t.Fatal(err)
@@ -441,7 +447,9 @@ func TestReadDirWithSubdirAndTrailingSlash(t *testing.T) {
 	}
 
 	// ReadDir should handle entries correctly
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		entries, err := dirFile.ReadDir(0)
 		if err != nil {
 			t.Fatal(err)

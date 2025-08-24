@@ -13,7 +13,7 @@ import (
 func TestDebugMockQueries(t *testing.T) {
 	driver := &DebugMockDriver{MockDriver: NewMockDriver()}
 	sql.Register("debug_mock", driver)
-	
+
 	db, err := sql.Open("debug_mock", "")
 	if err != nil {
 		t.Fatal(err)
@@ -31,7 +31,7 @@ func TestDebugMockQueries(t *testing.T) {
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("hello"))
 	w.Close()
-	
+
 	fmt.Println("\n=== Opening test.txt ===")
 	f, err := fs.Open("test.txt")
 	if err != nil {
@@ -43,7 +43,7 @@ func TestDebugMockQueries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	fmt.Printf("\nStat result: %+v\n", info)
 }
 

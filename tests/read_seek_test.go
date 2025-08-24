@@ -92,10 +92,10 @@ func TestReadErrorPaths(t *testing.T) {
 
 	// Read in chunks across fragment boundaries
 	sqliteFile := file.(*sqlitefs.SQLiteFile)
-	
+
 	// Seek to middle of first fragment
 	sqliteFile.Seek(512*1024, 0)
-	
+
 	// Read across fragment boundary
 	buf := make([]byte, 1024*1024)
 	n, err := file.Read(buf)
@@ -105,7 +105,7 @@ func TestReadErrorPaths(t *testing.T) {
 	if n != 1024*1024 {
 		t.Errorf("Expected to read 1MB, got %d", n)
 	}
-	
+
 	// Continue reading
 	n, err = file.Read(buf)
 	if err != nil {
@@ -133,11 +133,11 @@ func TestReaddirScanErrors(t *testing.T) {
 	writer := fs.NewWriter("dir1/subdir1/file1.txt")
 	writer.Write([]byte("test"))
 	writer.Close()
-	
+
 	writer = fs.NewWriter("dir1/subdir2/file2.txt")
 	writer.Write([]byte("test"))
 	writer.Close()
-	
+
 	writer = fs.NewWriter("dir1/file3.txt")
 	writer.Write([]byte("test"))
 	writer.Close()
@@ -150,20 +150,20 @@ func TestReaddirScanErrors(t *testing.T) {
 	defer dir.Close()
 
 	dirFile := dir.(*sqlitefs.SQLiteFile)
-	
+
 	// Read directory entries
 	infos, err := dirFile.Readdir(-1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Should have both subdirs and file
 	if len(infos) < 2 {
 		t.Errorf("Expected at least 2 entries, got %d", len(infos))
 	}
 }
 
-// Test createFileInfo for root path edge case  
+// Test createFileInfo for root path edge case
 func TestCreateFileInfoRootPath(t *testing.T) {
 	db, err := sql.Open("sqlite", "file::memory:?cache=shared")
 	if err != nil {

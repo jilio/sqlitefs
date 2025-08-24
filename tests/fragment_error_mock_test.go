@@ -68,19 +68,19 @@ func (s *lastPushMockStmt) Exec(args []driver.Value) (driver.Result, error) {
 	if contains(s.query, "CREATE") || contains(s.query, "ALTER") {
 		return &mockResult{}, nil
 	}
-	
+
 	// Check for custom handler
 	for pattern, handler := range s.conn.driver.execResponses {
 		if contains(s.query, pattern) {
 			return handler(args)
 		}
 	}
-	
+
 	// Default for INSERT/UPDATE
 	if contains(s.query, "INSERT") || contains(s.query, "UPDATE") {
 		return &mockResult{}, nil
 	}
-	
+
 	return &mockResult{}, nil
 }
 
@@ -91,7 +91,7 @@ func (s *lastPushMockStmt) Query(args []driver.Value) (driver.Rows, error) {
 			return handler(args)
 		}
 	}
-	
+
 	// Default handlers
 	if contains(s.query, "SELECT EXISTS") && contains(s.query, "file_metadata") {
 		if len(args) > 0 && args[0] == "" {
@@ -99,45 +99,45 @@ func (s *lastPushMockStmt) Query(args []driver.Value) (driver.Rows, error) {
 		}
 		return &mockRows{columns: []string{"exists"}, rows: [][]driver.Value{{0}}}, nil
 	}
-	
+
 	return &mockRows{columns: []string{}, rows: [][]driver.Value{}}, nil
 }
 
 // Test for lines 144-146: Empty fragment at EOF
 func TestEmptyFragmentAtEOF(t *testing.T) {
 	mockDriver := NewLastPushMockDriver()
-	
+
 	// File exists
 	mockDriver.queryResponses["SELECT EXISTS"] = func(args []driver.Value) (driver.Rows, error) {
 		return &mockRows{columns: []string{"exists"}, rows: [][]driver.Value{{1}}}, nil
 	}
-	
+
 	mockDriver.queryResponses["SELECT mime_type"] = func(args []driver.Value) (driver.Rows, error) {
 		return &mockRows{columns: []string{"mime_type"}, rows: [][]driver.Value{{""}}}, nil
 	}
-	
+
 	// File size equals offset
 	mockDriver.queryResponses["COUNT(*), COALESCE"] = func(args []driver.Value) (driver.Rows, error) {
 		return &mockRows{columns: []string{"count", "size"}, rows: [][]driver.Value{{1, 100}}}, nil
 	}
-	
+
 	sql.Register("lastpush1", mockDriver)
 	db, err := sql.Open("lastpush1", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	
+
 	fs, err := sqlitefs.NewSQLiteFS(db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	f, err := fs.Open("test.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Set up query to return data then empty fragment
 	callCount := 0
 	mockDriver.queryResponses["SELECT SUBSTR(fragment"] = func(args []driver.Value) (driver.Rows, error) {
@@ -149,14 +149,14 @@ func TestEmptyFragmentAtEOF(t *testing.T) {
 		// Return empty fragment when offset == size (lines 144-146)
 		return &mockRows{columns: []string{"fragment"}, rows: [][]driver.Value{{[]byte{}}}}, nil
 	}
-	
+
 	// Read all content
 	buf := make([]byte, 200)
 	n, err := f.Read(buf)
 	if n != 100 {
 		t.Fatalf("expected 100 bytes, got %d", n)
 	}
-	
+
 	// Try to read again - should hit empty fragment at EOF
 	n, err = f.Read(buf)
 	if n != 0 {
@@ -169,40 +169,40 @@ func TestEmptyFragmentAtEOF(t *testing.T) {
 func TestAllRemainingErrorPaths(t *testing.T) {
 	t.Run("CreateFileInfoDirQueryError", func(t *testing.T) {
 		mockDriver := NewLastPushMockDriver()
-		
+
 		// Directory check fails (lines 205-207)
 		mockDriver.queryResponses["SELECT 1 FROM file_metadata WHERE path = ?"] = func(args []driver.Value) (driver.Rows, error) {
 			return nil, errors.New("dir check failed")
 		}
-		
+
 		mockDriver.queryResponses["SELECT EXISTS"] = func(args []driver.Value) (driver.Rows, error) {
 			if len(args) > 0 && args[0] == "" {
 				return &mockRows{columns: []string{"exists"}, rows: [][]driver.Value{{1}}}, nil
 			}
 			return &mockRows{columns: []string{"exists"}, rows: [][]driver.Value{{0}}}, nil
 		}
-		
+
 		sql.Register("lastpush2", mockDriver)
 		db, err := sql.Open("lastpush2", "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer db.Close()
-		
+
 		fs, err := sqlitefs.NewSQLiteFS(db)
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		_, err = fs.Open("test")
 		if err == nil || err.Error() != "dir check failed" {
 			t.Fatalf("expected 'dir check failed', got %v", err)
 		}
 	})
-	
+
 	t.Run("SQLiteFSOpenErrors", func(t *testing.T) {
 		mockDriver := NewLastPushMockDriver()
-		
+
 		// EXISTS query error (lines 79-81)
 		mockDriver.queryResponses["SELECT EXISTS"] = func(args []driver.Value) (driver.Rows, error) {
 			if len(args) > 0 && args[0] != "" {
@@ -210,28 +210,28 @@ func TestAllRemainingErrorPaths(t *testing.T) {
 			}
 			return &mockRows{columns: []string{"exists"}, rows: [][]driver.Value{{1}}}, nil
 		}
-		
+
 		sql.Register("lastpush3", mockDriver)
 		db, err := sql.Open("lastpush3", "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer db.Close()
-		
+
 		fs, err := sqlitefs.NewSQLiteFS(db)
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		_, err = fs.Open("test")
 		if err == nil || err.Error() != "exists failed" {
 			t.Fatalf("expected 'exists failed', got %v", err)
 		}
 	})
-	
+
 	t.Run("SQLiteFSTypeQueryError", func(t *testing.T) {
 		mockDriver := NewLastPushMockDriver()
-		
+
 		// EXISTS returns false
 		mockDriver.queryResponses["SELECT EXISTS"] = func(args []driver.Value) (driver.Rows, error) {
 			if len(args) > 0 && args[0] == "" {
@@ -239,33 +239,33 @@ func TestAllRemainingErrorPaths(t *testing.T) {
 			}
 			return &mockRows{columns: []string{"exists"}, rows: [][]driver.Value{{0}}}, nil
 		}
-		
+
 		// Type query fails (lines 92-94)
 		mockDriver.queryResponses["SELECT type FROM file_metadata"] = func(args []driver.Value) (driver.Rows, error) {
 			return nil, errors.New("type failed")
 		}
-		
+
 		sql.Register("lastpush4", mockDriver)
 		db, err := sql.Open("lastpush4", "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer db.Close()
-		
+
 		fs, err := sqlitefs.NewSQLiteFS(db)
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		_, err = fs.Open("test")
 		if err == nil || err.Error() != "type failed" {
 			t.Fatalf("expected 'type failed', got %v", err)
 		}
 	})
-	
+
 	t.Run("WriterCommitError", func(t *testing.T) {
 		mockDriver := NewLastPushMockDriver()
-		
+
 		// Commit fails (lines 183-185)
 		commitFail := false
 		mockDriver.execResponses["COMMIT"] = func(args []driver.Value) (driver.Result, error) {
@@ -274,183 +274,183 @@ func TestAllRemainingErrorPaths(t *testing.T) {
 			}
 			return &mockResult{}, nil
 		}
-		
+
 		sql.Register("lastpush5", mockDriver)
 		db, err := sql.Open("lastpush5", "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer db.Close()
-		
+
 		fs, err := sqlitefs.NewSQLiteFS(db)
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		w := fs.NewWriter("test.txt")
 		w.Write([]byte("data"))
-		
+
 		commitFail = true
 		err = w.Close()
 		if err == nil || err.Error() != "commit failed" {
 			t.Fatalf("expected 'commit failed', got %v", err)
 		}
 	})
-	
+
 	t.Run("CreateFileInfoErrors", func(t *testing.T) {
 		mockDriver := NewLastPushMockDriver()
-		
+
 		mockDriver.queryResponses["SELECT EXISTS"] = func(args []driver.Value) (driver.Rows, error) {
 			return &mockRows{columns: []string{"exists"}, rows: [][]driver.Value{{1}}}, nil
 		}
-		
+
 		mockDriver.queryResponses["SELECT type FROM file_metadata"] = func(args []driver.Value) (driver.Rows, error) {
 			return &mockRows{columns: []string{"type"}, rows: [][]driver.Value{{"dir"}}}, nil
 		}
-		
+
 		// Directory query error (lines 520-522)
 		mockDriver.queryResponses["SELECT 1 FROM file_metadata WHERE path LIKE"] = func(args []driver.Value) (driver.Rows, error) {
 			return nil, errors.New("dir query failed")
 		}
-		
+
 		sql.Register("lastpush6", mockDriver)
 		db, err := sql.Open("lastpush6", "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer db.Close()
-		
+
 		fs, err := sqlitefs.NewSQLiteFS(db)
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		f, err := fs.Open("")
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		_, err = f.Stat()
 		if err == nil || err.Error() != "dir query failed" {
 			t.Fatalf("expected 'dir query failed', got %v", err)
 		}
 	})
-	
+
 	t.Run("CreateFileInfoFileQueryError", func(t *testing.T) {
 		mockDriver := NewLastPushMockDriver()
-		
+
 		mockDriver.queryResponses["SELECT EXISTS"] = func(args []driver.Value) (driver.Rows, error) {
 			return &mockRows{columns: []string{"exists"}, rows: [][]driver.Value{{1}}}, nil
 		}
-		
+
 		mockDriver.queryResponses["SELECT mime_type"] = func(args []driver.Value) (driver.Rows, error) {
 			return &mockRows{columns: []string{"mime_type"}, rows: [][]driver.Value{{""}}}, nil
 		}
-		
+
 		// File query error (lines 532-534)
 		mockDriver.queryResponses["SELECT id FROM file_metadata WHERE path = ? AND type = 'file'"] = func(args []driver.Value) (driver.Rows, error) {
 			return nil, errors.New("file query failed")
 		}
-		
+
 		sql.Register("lastpush7", mockDriver)
 		db, err := sql.Open("lastpush7", "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer db.Close()
-		
+
 		fs, err := sqlitefs.NewSQLiteFS(db)
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		f, err := fs.Open("test.txt")
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		_, err = f.Stat()
 		if err == nil || err.Error() != "file query failed" {
 			t.Fatalf("expected 'file query failed', got %v", err)
 		}
 	})
-	
+
 	t.Run("CreateFileInfoSumError", func(t *testing.T) {
 		mockDriver := NewLastPushMockDriver()
-		
+
 		mockDriver.queryResponses["SELECT EXISTS"] = func(args []driver.Value) (driver.Rows, error) {
 			return &mockRows{columns: []string{"exists"}, rows: [][]driver.Value{{1}}}, nil
 		}
-		
+
 		mockDriver.queryResponses["SELECT mime_type"] = func(args []driver.Value) (driver.Rows, error) {
 			return &mockRows{columns: []string{"mime_type"}, rows: [][]driver.Value{{""}}}, nil
 		}
-		
+
 		mockDriver.queryResponses["SELECT id FROM file_metadata WHERE path = ? AND type = 'file'"] = func(args []driver.Value) (driver.Rows, error) {
 			return &mockRows{columns: []string{"id"}, rows: [][]driver.Value{{int64(1)}}}, nil
 		}
-		
+
 		// SUM query error (lines 538-540, 541-543)
 		mockDriver.queryResponses["COALESCE(SUM(LENGTH(fragment))"] = func(args []driver.Value) (driver.Rows, error) {
 			return nil, errors.New("sum failed")
 		}
-		
+
 		sql.Register("lastpush8", mockDriver)
 		db, err := sql.Open("lastpush8", "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer db.Close()
-		
+
 		fs, err := sqlitefs.NewSQLiteFS(db)
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		f, err := fs.Open("test.txt")
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		_, err = f.Stat()
 		if err == nil || err.Error() != "sum failed" {
 			t.Fatalf("expected 'sum failed', got %v", err)
 		}
 	})
-	
+
 	t.Run("GetTotalSizeRowsErr", func(t *testing.T) {
 		mockDriver := NewLastPushMockDriver()
-		
+
 		mockDriver.queryResponses["SELECT EXISTS"] = func(args []driver.Value) (driver.Rows, error) {
 			return &mockRows{columns: []string{"exists"}, rows: [][]driver.Value{{1}}}, nil
 		}
-		
+
 		mockDriver.queryResponses["SELECT mime_type"] = func(args []driver.Value) (driver.Rows, error) {
 			return &mockRows{columns: []string{"mime_type"}, rows: [][]driver.Value{{""}}}, nil
 		}
-		
+
 		// Return rows that will error (lines 582-584)
 		mockDriver.queryResponses["COUNT(*), COALESCE"] = func(args []driver.Value) (driver.Rows, error) {
 			return &rowsWithError{}, nil
 		}
-		
+
 		sql.Register("lastpush9", mockDriver)
 		db, err := sql.Open("lastpush9", "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer db.Close()
-		
+
 		fs, err := sqlitefs.NewSQLiteFS(db)
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		f, err := fs.Open("test.txt")
 		if err != nil {
 			t.Fatal(err)
 		}
-		
+
 		// getTotalSize should fail with rows.Err()
 		// This is called internally by Stat
 		_, err = f.Stat()

@@ -50,7 +50,7 @@ func TestReadEOFWithBytesRead(t *testing.T) {
 	}
 	totalRead += n
 
-	// Second read: 2000 bytes  
+	// Second read: 2000 bytes
 	n, err = f.Read(buf)
 	if err != nil {
 		t.Fatal(err)
@@ -225,7 +225,9 @@ func TestReadDirQueryError(t *testing.T) {
 	// Close database to cause query error
 	db.Close()
 
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		_, err = dirFile.ReadDir(0)
 		if err == nil {
 			t.Fatal("expected error when database is closed")
@@ -266,7 +268,9 @@ func TestReadDirSubdirError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		entries, err := dirFile.ReadDir(0)
 		if err != nil {
 			t.Fatal(err)
@@ -303,7 +307,9 @@ func TestReadDirCleanEmptyName(t *testing.T) {
 		return
 	}
 
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		entries, err := dirFile.ReadDir(0)
 		if err != nil {
 			// Error is expected when clean name is empty
@@ -343,7 +349,9 @@ func TestReaddirQueryError(t *testing.T) {
 	// Close database to cause query error
 	db.Close()
 
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		_, err = dirFile.Readdir(0)
 		if err == nil {
 			t.Fatal("expected error when database is closed")
@@ -374,7 +382,9 @@ func TestReaddirNotDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		_, err = dirFile.Readdir(0)
 		if err == nil || err.Error() != "not a directory" {
 			t.Fatalf("expected 'not a directory' error, got %v", err)
@@ -411,7 +421,9 @@ func TestReaddirCleanPathContinue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		infos, err := dirFile.Readdir(0)
 		if err != nil {
 			t.Fatal(err)
@@ -454,7 +466,9 @@ func TestReaddirScanError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if dirFile, ok := f.(interface{ Readdir(int) ([]os.FileInfo, error) }); ok {
+	if dirFile, ok := f.(interface {
+		Readdir(int) ([]os.FileInfo, error)
+	}); ok {
 		_, err = dirFile.Readdir(0)
 		// Should handle the error gracefully
 		if err != nil && err != io.EOF {

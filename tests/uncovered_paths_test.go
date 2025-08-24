@@ -22,7 +22,7 @@ func TestReadAtExactEOF(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create a file with exact content
 	content := []byte("test")
 	w := fs.NewWriter("test.txt")
@@ -66,7 +66,7 @@ func TestReadNoRowsNoData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create a file then delete its fragments
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("data"))
@@ -105,7 +105,7 @@ func TestSeekEndDatabaseError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create file
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("content"))
@@ -140,7 +140,7 @@ func TestReadDirNotDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create a file
 	w := fs.NewWriter("file.txt")
 	w.Write([]byte("content"))
@@ -152,7 +152,9 @@ func TestReadDirNotDirectory(t *testing.T) {
 	}
 
 	// Try ReadDir on file - should error
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		_, err = dirFile.ReadDir(0)
 		if err == nil || err.Error() != "not a directory" {
 			t.Fatalf("expected 'not a directory', got %v", err)
@@ -172,7 +174,7 @@ func TestReadDirPathNormalization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create files in directory
 	w1 := fs.NewWriter("testdir/file1.txt")
 	w1.Write([]byte("content1"))
@@ -188,7 +190,9 @@ func TestReadDirPathNormalization(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		entries, err := dirFile.ReadDir(0)
 		if err != nil {
 			t.Fatal(err)
@@ -211,7 +215,7 @@ func TestReadDirCleanNameSlash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Manually insert dir with trailing slash
 	_, err = db.Exec("INSERT INTO file_metadata (path, type) VALUES (?, ?)", "parent/subdir/", "dir")
 	if err != nil {
@@ -228,7 +232,9 @@ func TestReadDirCleanNameSlash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if dirFile, ok := f.(interface{ ReadDir(int) ([]os.DirEntry, error) }); ok {
+	if dirFile, ok := f.(interface {
+		ReadDir(int) ([]os.DirEntry, error)
+	}); ok {
 		entries, err := dirFile.ReadDir(0)
 		if err != nil {
 			t.Fatal(err)
@@ -274,7 +280,7 @@ func TestGetTotalSizeFileMetadataNoFragments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Directly insert metadata without fragments
 	_, err = db.Exec("INSERT INTO file_metadata (path, type) VALUES (?, ?)", "empty.txt", "file")
 	if err != nil {
@@ -290,7 +296,7 @@ func TestGetTotalSizeFileMetadataNoFragments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Should be size 0
 	if info.Size() != 0 {
 		t.Fatalf("expected size 0, got %d", info.Size())
@@ -308,14 +314,14 @@ func TestWriteFragmentDBError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Write data
 	w := fs.NewWriter("test.txt")
 	w.Write([]byte("data"))
-	
+
 	// Close DB before closing writer
 	db.Close()
-	
+
 	// Close should fail
 	err = w.Close()
 	if err == nil {
@@ -334,7 +340,7 @@ func TestOpenDatabaseQueryError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Close DB
 	db.Close()
 
