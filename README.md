@@ -1,5 +1,10 @@
 # SQLiteFS
 
+[![GoDoc](https://godoc.org/github.com/jilio/sqlitefs?status.svg)](https://godoc.org/github.com/jilio/sqlitefs)
+[![Test and Coverage](https://github.com/jilio/sqlitefs/actions/workflows/test.yml/badge.svg)](https://github.com/jilio/sqlitefs/actions/workflows/test.yml)
+[![Go Coverage](https://github.com/jilio/sqlitefs/wiki/coverage.svg)](https://raw.githack.com/wiki/jilio/sqlitefs/coverage.html)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jilio/sqlitefs)](https://goreportcard.com/report/github.com/jilio/sqlitefs)
+
 SQLiteFS is a Go package that implements the `fs.FS` interface using SQLite as a storage backend. This allows you to store and access files directly from a SQLite database, which can be useful for embedded applications, resource-constrained systems, or when you need a unified storage for both files and metadata.
 
 ## Features

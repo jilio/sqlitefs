@@ -120,11 +120,15 @@ func (e *PathError) Error() string {
 
 // createTablesIfNeeded создает таблицы file_metadata и file_fragments, если они еще не созданы.
 func (fs *SQLiteFS) createTablesIfNeeded() error {
+	// First, try to add mime_type column if it doesn't exist (for migration)
+	fs.db.Exec("ALTER TABLE file_metadata ADD COLUMN mime_type TEXT")
+
 	_, err := fs.db.Exec(`
         CREATE TABLE IF NOT EXISTS file_metadata (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             path TEXT UNIQUE NOT NULL,
-            type TEXT NOT NULL
+            type TEXT NOT NULL,
+            mime_type TEXT
         );
         CREATE TABLE IF NOT EXISTS file_fragments (
             file_id INTEGER NOT NULL,
@@ -155,7 +159,9 @@ func (fs *SQLiteFS) writerLoop() {
 }
 
 func (fs *SQLiteFS) createFileRecord(path, mimeType string) error {
-	_, err := fs.db.Exec("INSERT OR REPLACE INTO file_metadata (path, type) VALUES (?, ?)", path, mimeType)
+	// Store both the type (file/dir) and the MIME type
+	_, err := fs.db.Exec("INSERT OR REPLACE INTO file_metadata (path, type, mime_type) VALUES (?, ?, ?)",
+		path, "file", mimeType)
 	return err
 }
 
