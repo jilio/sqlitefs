@@ -502,11 +502,8 @@ func (f *SQLiteFile) Readdir(count int) ([]os.FileInfo, error) {
 	result := f.readdirCache[start:end]
 	*f.readdirOffset = end
 
-	// If we've reached the end of all entries, return io.EOF
-	if end >= len(f.readdirCache) {
-		return result, io.EOF
-	}
-
+	// Return the results without EOF, even if we've reached the end
+	// EOF will be returned on the next call when there are no entries to return
 	return result, nil
 }
 
