@@ -29,6 +29,21 @@ func (d *MockDriver) SetError(pattern string, err error) {
 	d.errorRules[pattern] = err
 }
 
+// SetData sets mock data to return for queries containing the pattern
+func (d *MockDriver) SetData(pattern string, rows [][]interface{}) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	// Convert to driver.Value format
+	driverRows := make([][]driver.Value, len(rows))
+	for i, row := range rows {
+		driverRows[i] = make([]driver.Value, len(row))
+		for j, val := range row {
+			driverRows[i][j] = driver.Value(val)
+		}
+	}
+	d.data[pattern] = driverRows
+}
+
 // ClearErrors removes all error rules
 func (d *MockDriver) ClearErrors() {
 	d.mu.Lock()
@@ -140,6 +155,32 @@ func (s *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
 		if strings.Contains(s.query, pattern) {
 			s.conn.driver.mu.RUnlock()
 			return nil, err
+		}
+	}
+	
+	// Check for mock data
+	for pattern, rows := range s.conn.driver.data {
+		if strings.Contains(s.query, pattern) {
+			s.conn.driver.mu.RUnlock()
+			// Figure out column names from query
+			columns := []string{"result"}
+			if strings.Contains(s.query, "COUNT") {
+				columns = []string{"count", "size"}
+			} else if strings.Contains(s.query, "EXISTS") {
+				columns = []string{"exists"}
+			} else if strings.Contains(s.query, "type") {
+				columns = []string{"type"}
+			} else if strings.Contains(s.query, "id") {
+				columns = []string{"id"}
+			} else if strings.Contains(s.query, "SUBSTR") {
+				columns = []string{"fragment"}
+			} else if strings.Contains(s.query, "path") {
+				columns = []string{"path", "type"}
+			}
+			return &mockRows{
+				columns: columns,
+				rows:    rows,
+			}, nil
 		}
 	}
 	s.conn.driver.mu.RUnlock()
