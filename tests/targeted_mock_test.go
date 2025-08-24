@@ -67,6 +67,9 @@ func (s *simpleMockStmt) NumInput() int {
 }
 
 func (s *simpleMockStmt) Exec(args []driver.Value) (driver.Result, error) {
+	// Debug logging (uncomment to debug)
+	// fmt.Printf("Exec query: %s\n", s.query)
+
 	// Handle table creation
 	if contains(s.query, "CREATE") || contains(s.query, "ALTER") {
 		return &mockResult{}, nil
@@ -75,10 +78,12 @@ func (s *simpleMockStmt) Exec(args []driver.Value) (driver.Result, error) {
 	// Check for custom handler
 	for pattern, handler := range s.conn.driver.execResponses {
 		if contains(s.query, pattern) {
+			// fmt.Printf("  Matched pattern: %s\n", pattern)
 			return handler(args)
 		}
 	}
 
+	// fmt.Printf("  No pattern matched, returning default\n")
 	return &mockResult{}, nil
 }
 

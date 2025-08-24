@@ -103,14 +103,18 @@ func (f *SQLiteFile) Read(p []byte) (int, error) {
 		internalOffset := f.offset % fragmentSize
 
 		// Determine how many bytes to read from the current fragment
-		readLength := min(fragmentSize-internalOffset, int64(len(p))-int64(bytesReadTotal))
+		remainingInBuffer := int64(len(p)) - int64(bytesReadTotal)
+		remainingInFragment := fragmentSize - internalOffset
+		remainingInFile := f.size - f.offset
+		readLength := min(min(remainingInFragment, remainingInBuffer), remainingInFile)
 
 		// If we've reached the end of the file, return what we've read so far
 		if f.offset >= f.size {
 			if bytesReadTotal == 0 {
 				return 0, io.EOF
 			}
-			return bytesReadTotal, nil
+			// We've read some bytes and reached EOF
+			return bytesReadTotal, io.EOF
 		}
 
 		// SQL query to read a substring of the fragment
@@ -502,8 +506,19 @@ func (f *SQLiteFile) Readdir(count int) ([]os.FileInfo, error) {
 	result := f.readdirCache[start:end]
 	*f.readdirOffset = end
 
-	// Return the results without EOF, even if we've reached the end
-	// EOF will be returned on the next call when there are no entries to return
+	// Standard Go behavior: 
+	// - When reading all (count <= 0), return all entries with nil error
+	// - When reading in batches (count > 0), can return EOF with last batch
+	// - Always return EOF when there are no entries to return
+	if len(result) == 0 {
+		return nil, io.EOF
+	}
+	
+	// For batch reads, return EOF with the last batch if we've exhausted entries
+	if count > 0 && end >= len(f.readdirCache) {
+		return result, io.EOF
+	}
+	
 	return result, nil
 }
 
@@ -518,6 +533,16 @@ func (f *SQLiteFile) Close() error {
 // MimeType returns the MIME type of the file, or empty string if not available or if it's a directory
 func (f *SQLiteFile) MimeType() string {
 	return f.mimeType
+}
+
+// GetOffset returns the current read offset (for debugging)
+func (f *SQLiteFile) GetOffset() int64 {
+	return f.offset
+}
+
+// GetSize returns the file size (for debugging)
+func (f *SQLiteFile) GetSize() int64 {
+	return f.size
 }
 
 func (f *SQLiteFile) createFileInfo(path string) (os.FileInfo, error) {

@@ -208,7 +208,7 @@ func TestSimpleCoverage(t *testing.T) {
 		// This would test error conditions in writer, but it's hard without mocks
 		// At least we can test the normal path
 		w := fs.NewWriter("writer_test.txt")
-		
+
 		// Write some data
 		n, err := w.Write([]byte("test"))
 		if err != nil {

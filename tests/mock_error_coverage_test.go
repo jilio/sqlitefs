@@ -565,8 +565,8 @@ func TestWriteFragmentErrorPaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Make the INSERT fail
-		driver.SetError("INSERT INTO file_fragments", errors.New("insert failed"))
+		// Make the INSERT fail (it's actually INSERT OR REPLACE)
+		driver.SetError("file_fragments", errors.New("insert failed"))
 
 		w := fs.NewWriter("test.txt")
 		_, err = w.Write([]byte("data"))

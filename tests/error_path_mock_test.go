@@ -184,8 +184,8 @@ func TestWriteFragmentExecError(t *testing.T) {
 		return &mockResult{lastInsertId: 1, rowsAffected: 1}, nil
 	}
 
-	// Make fragment INSERT fail
-	mockDriver.execResponses["INSERT INTO file_fragments"] = func(args []driver.Value) (driver.Result, error) {
+	// Make fragment INSERT fail (note: it's INSERT OR REPLACE, not just INSERT)
+	mockDriver.execResponses["INSERT OR REPLACE INTO file_fragments"] = func(args []driver.Value) (driver.Result, error) {
 		return nil, errors.New("exec failed")
 	}
 
