@@ -64,9 +64,11 @@ func TestGetTotalSizeErrorPaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Set up mock to return sql.ErrNoRows for COUNT query
-		driver.SetError("SELECT COUNT", sql.ErrNoRows)
-		// And return false for EXISTS query  
+		// For the Open to succeed, we need to handle the initial queries
+		// But for getTotalSize to fail properly:
+		// 1. The COUNT query in getTotalSize should return no rows (triggers sql.ErrNoRows)
+		driver.SetData("SELECT COUNT(*), COALESCE", [][]interface{}{}) // Empty result = sql.ErrNoRows
+		// 2. The EXISTS check should return false
 		driver.SetData("SELECT EXISTS", [][]interface{}{{false}})
 
 		// This should trigger line 585: return os.ErrNotExist

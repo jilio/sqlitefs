@@ -130,8 +130,10 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 	}
 	s.conn.driver.mu.RUnlock()
 
-	// Handle CREATE TABLE
-	if strings.Contains(s.query, "CREATE TABLE") {
+	// Handle CREATE TABLE, CREATE INDEX, ALTER TABLE
+	if strings.Contains(s.query, "CREATE TABLE") || 
+	   strings.Contains(s.query, "CREATE INDEX") ||
+	   strings.Contains(s.query, "ALTER TABLE") {
 		return &mockResult{}, nil
 	}
 
@@ -145,23 +147,28 @@ func (s *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
 		return &mockResult{rowsAffected: 1}, nil
 	}
 
+	// Handle UPDATE
+	if strings.Contains(s.query, "UPDATE") {
+		return &mockResult{rowsAffected: 1}, nil
+	}
+
 	return &mockResult{}, nil
 }
 
 func (s *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
-	// Check for errors first
 	s.conn.driver.mu.RLock()
+	defer s.conn.driver.mu.RUnlock()
+	
+	// Check for errors first
 	for pattern, err := range s.conn.driver.errorRules {
 		if strings.Contains(s.query, pattern) {
-			s.conn.driver.mu.RUnlock()
 			return nil, err
 		}
 	}
 	
-	// Check for mock data
+	// Check for mock data - this takes priority over defaults
 	for pattern, rows := range s.conn.driver.data {
 		if strings.Contains(s.query, pattern) {
-			s.conn.driver.mu.RUnlock()
 			// Figure out column names from query
 			columns := []string{"result"}
 			if strings.Contains(s.query, "COUNT") {
@@ -183,10 +190,16 @@ func (s *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
 			}, nil
 		}
 	}
-	s.conn.driver.mu.RUnlock()
 
-	// Handle different query types
+	// Handle different query types - these are defaults when no mock data is set
 	if strings.Contains(s.query, "SELECT EXISTS") {
+		// Directory existence check - root always exists
+		if strings.Contains(s.query, "path = ?") && len(args) > 0 && args[0] == "" {
+			return &mockRows{
+				columns: []string{"exists"},
+				rows:    [][]driver.Value{{1}}, // Root directory exists
+			}, nil
+		}
 		// File existence check - check if we should return false
 		if strings.Contains(s.query, "nonexistent") {
 			return &mockRows{
@@ -196,7 +209,7 @@ func (s *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
 		}
 		return &mockRows{
 			columns: []string{"exists"},
-			rows:    [][]driver.Value{{1}}, // File exists
+			rows:    [][]driver.Value{{1}}, // Default: exists
 		}, nil
 	}
 
@@ -234,6 +247,24 @@ func (s *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
 				{"dir/file2.txt", "file"},
 				{"dir/subdir/", "dir"},
 			},
+		}, nil
+	}
+
+	// Handle COUNT queries for directory checks
+	if strings.Contains(s.query, "SELECT COUNT") {
+		// Default: return 0 (empty/doesn't exist)
+		return &mockRows{
+			columns: []string{"count"},
+			rows:    [][]driver.Value{{int64(0)}},
+		}, nil
+	}
+
+	// Handle type queries for Open
+	if strings.Contains(s.query, "SELECT type FROM file_metadata") {
+		// Default: assume it's a directory
+		return &mockRows{
+			columns: []string{"type"},
+			rows:    [][]driver.Value{{"dir"}},
 		}, nil
 	}
 
