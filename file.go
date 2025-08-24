@@ -139,11 +139,15 @@ func (f *SQLiteFile) Read(p []byte) (int, error) {
 		bytesReadTotal += bytesRead
 		f.offset += int64(bytesRead) // Update file offset
 
-		// If bytesRead is 0 and this is the last fragment, return what we've read
+		// If bytesRead is 0, we need to handle empty fragments
 		if bytesRead == 0 {
 			if f.offset >= f.size {
 				return bytesReadTotal, nil
 			}
+			// Move to the next fragment to avoid infinite loop on empty fragments
+			// Calculate the start of the next fragment
+			nextFragmentStart := (fragmentIndex + 1) * fragmentSize
+			f.offset = nextFragmentStart
 			continue // Continue reading the next fragment
 		}
 

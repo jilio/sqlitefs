@@ -225,13 +225,55 @@ func TestCreateFileInfoNonExistentDir(t *testing.T) {
 }
 
 // TestReadZeroBytesFragment tests Read when fragment has zero bytes
-// SKIPPED: This test causes an infinite loop in Read() when encountering empty fragments
-func TestReadZeroBytesFragment_DISABLED(t *testing.T) {
-	t.Skip("Causes infinite loop - Read() doesn't handle empty fragments correctly")
-	// The code below would hang:
-	// When Read() encounters an empty fragment (bytesRead == 0), it continues
-	// to the next iteration, but if fragmentIndex doesn't increment properly,
-	// it keeps reading the same empty fragment infinitely
+func TestReadZeroBytesFragment(t *testing.T) {
+	db, err := sql.Open("sqlite", "file::memory:?cache=shared")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	fs, err := sqlitefs.NewSQLiteFS(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	
+	// Create file with content
+	w := fs.NewWriter("test.txt")
+	w.Write([]byte("hello"))
+	w.Close()
+
+	// Get file ID
+	var fileID int64
+	err = db.QueryRow("SELECT id FROM file_metadata WHERE path = ?", "test.txt").Scan(&fileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	
+	// Insert empty fragment at index 1
+	_, err = db.Exec("INSERT INTO file_fragments (file_id, fragment_index, fragment) VALUES (?, ?, ?)", 
+		fileID, 1, []byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Open and read
+	f, err := fs.Open("test.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	buf := make([]byte, 100)
+	n, err := f.Read(buf)
+	if err != nil && err != io.EOF {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should still read the non-empty content from fragment 0
+	if n == 0 {
+		t.Fatal("expected to read some bytes")
+	}
+	if string(buf[:n]) != "hello" {
+		t.Fatalf("expected 'hello', got %s", string(buf[:n]))
+	}
 }
 
 // TestReadNoFragments tests Read when file has no fragments
