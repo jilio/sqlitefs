@@ -1148,15 +1148,15 @@ func TestEdgeCases(t *testing.T) {
 		writer := fs.NewWriter("seekvar.txt")
 		writer.Write(data)
 		writer.Close()
-		
+
 		file, err := fs.Open("seekvar.txt")
 		if err != nil {
 			t.Fatalf("Failed to open file: %v", err)
 		}
 		defer file.Close()
-		
+
 		sqlFile := file.(*sqlitefs.SQLiteFile)
-		
+
 		// Test SeekEnd
 		pos, err := sqlFile.Seek(-5, io.SeekEnd)
 		if err != nil {
@@ -1165,7 +1165,7 @@ func TestEdgeCases(t *testing.T) {
 		if pos != int64(len(data)-5) {
 			t.Errorf("Expected position %d, got %d", len(data)-5, pos)
 		}
-		
+
 		buf := make([]byte, 5)
 		n, err := file.Read(buf)
 		if err != nil && err != io.EOF {
@@ -1177,7 +1177,7 @@ func TestEdgeCases(t *testing.T) {
 		if string(buf) != "FGHIJ" {
 			t.Errorf("Expected 'FGHIJ', got '%s'", string(buf))
 		}
-		
+
 		// Test SeekCurrent
 		sqlFile.Seek(5, io.SeekStart)
 		pos, err = sqlFile.Seek(3, io.SeekCurrent)
@@ -1186,6 +1186,207 @@ func TestEdgeCases(t *testing.T) {
 		}
 		if pos != 8 {
 			t.Errorf("Expected position 8, got %d", pos)
+		}
+	})
+}
+
+// TestRemove tests file and directory removal operations
+func TestRemove(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	fs, err := sqlitefs.NewSQLiteFS(db)
+	if err != nil {
+		t.Fatalf("Failed to create SQLiteFS: %v", err)
+	}
+	defer fs.Close()
+
+	t.Run("RemoveExistingFile", func(t *testing.T) {
+		writer := fs.NewWriter("toremove.txt")
+		writer.Write([]byte("content"))
+		writer.Close()
+
+		// Verify file exists
+		_, err := fs.Open("toremove.txt")
+		if err != nil {
+			t.Fatalf("File should exist before removal: %v", err)
+		}
+
+		// Remove the file
+		err = fs.Remove("toremove.txt")
+		if err != nil {
+			t.Fatalf("Failed to remove file: %v", err)
+		}
+
+		// Verify file no longer exists
+		_, err = fs.Open("toremove.txt")
+		if err == nil {
+			t.Error("File should not exist after removal")
+		}
+	})
+
+	t.Run("RemoveNonExistentFile", func(t *testing.T) {
+		err := fs.Remove("nonexistent.txt")
+		if err == nil {
+			t.Error("Expected error when removing non-existent file")
+		}
+	})
+
+	t.Run("RemoveFileWithFragments", func(t *testing.T) {
+		// Create a large file with multiple fragments (>16KB)
+		data := make([]byte, 20000)
+		for i := range data {
+			data[i] = byte(i % 256)
+		}
+
+		writer := fs.NewWriter("largefile.bin")
+		writer.Write(data)
+		writer.Close()
+
+		// Verify file exists and has correct size
+		file, err := fs.Open("largefile.bin")
+		if err != nil {
+			t.Fatalf("Failed to open large file: %v", err)
+		}
+		info, _ := file.Stat()
+		if info.Size() != int64(len(data)) {
+			t.Errorf("Expected size %d, got %d", len(data), info.Size())
+		}
+		file.Close()
+
+		// Remove the file
+		err = fs.Remove("largefile.bin")
+		if err != nil {
+			t.Fatalf("Failed to remove large file: %v", err)
+		}
+
+		// Verify file no longer exists
+		_, err = fs.Open("largefile.bin")
+		if err == nil {
+			t.Error("Large file should not exist after removal")
+		}
+	})
+
+	t.Run("RemoveWithPathVariations", func(t *testing.T) {
+		// Test with leading slash
+		writer := fs.NewWriter("pathtest1.txt")
+		writer.Write([]byte("test"))
+		writer.Close()
+
+		err := fs.Remove("/pathtest1.txt")
+		if err != nil {
+			t.Errorf("Failed to remove with leading slash: %v", err)
+		}
+
+		// Test without leading slash
+		writer = fs.NewWriter("pathtest2.txt")
+		writer.Write([]byte("test"))
+		writer.Close()
+
+		err = fs.Remove("pathtest2.txt")
+		if err != nil {
+			t.Errorf("Failed to remove without leading slash: %v", err)
+		}
+	})
+
+	t.Run("RemoveAndRecreate", func(t *testing.T) {
+		// Create file
+		writer := fs.NewWriter("recreate.txt")
+		writer.Write([]byte("original"))
+		writer.Close()
+
+		// Remove it
+		err := fs.Remove("recreate.txt")
+		if err != nil {
+			t.Fatalf("Failed to remove file: %v", err)
+		}
+
+		// Recreate with different content
+		writer = fs.NewWriter("recreate.txt")
+		writer.Write([]byte("new content"))
+		writer.Close()
+
+		// Verify new content
+		file, err := fs.Open("recreate.txt")
+		if err != nil {
+			t.Fatalf("Failed to open recreated file: %v", err)
+		}
+		defer file.Close()
+
+		buf := make([]byte, 20)
+		n, _ := file.Read(buf)
+		if string(buf[:n]) != "new content" {
+			t.Errorf("Expected 'new content', got '%s'", string(buf[:n]))
+		}
+	})
+
+	t.Run("RemoveEmptyDirectory", func(t *testing.T) {
+		// Create a file in a directory
+		writer := fs.NewWriter("emptydir/file.txt")
+		writer.Write([]byte("temp"))
+		writer.Close()
+
+		// Remove the file first
+		err := fs.Remove("emptydir/file.txt")
+		if err != nil {
+			t.Fatalf("Failed to remove file in directory: %v", err)
+		}
+
+		// Now directory is "empty" (no files with emptydir/ prefix)
+		// Since directories don't exist as explicit entries in sqlitefs,
+		// attempting to remove an empty directory path should return "file not found"
+		err = fs.Remove("emptydir")
+		if err == nil {
+			t.Error("Expected error when removing non-existent directory entry")
+		}
+	})
+
+	t.Run("RemoveNonEmptyDirectory", func(t *testing.T) {
+		// Create files in a directory
+		writer := fs.NewWriter("nonemptydir/file1.txt")
+		writer.Write([]byte("content1"))
+		writer.Close()
+
+		writer = fs.NewWriter("nonemptydir/file2.txt")
+		writer.Write([]byte("content2"))
+		writer.Close()
+
+		// Try to remove directory (should fail - directory not empty)
+		err := fs.Remove("nonemptydir")
+		if err == nil {
+			t.Error("Expected error when removing non-empty directory")
+		}
+
+		// Files should still exist
+		_, err = fs.Open("nonemptydir/file1.txt")
+		if err != nil {
+			t.Error("File should still exist after failed directory removal")
+		}
+	})
+
+	t.Run("RemoveDirectoryWithTrailingSlash", func(t *testing.T) {
+		// Create a file in a directory
+		writer := fs.NewWriter("slashdir/file.txt")
+		writer.Write([]byte("content"))
+		writer.Close()
+
+		// Try to remove with trailing slash (should fail - not empty)
+		err := fs.Remove("slashdir/")
+		if err == nil {
+			t.Error("Expected error when removing non-empty directory with trailing slash")
+		}
+
+		// Remove the file
+		err = fs.Remove("slashdir/file.txt")
+		if err != nil {
+			t.Fatalf("Failed to remove file: %v", err)
+		}
+
+		// Now try to remove empty directory with trailing slash
+		// Should return "file not found" since directories aren't explicit entries
+		err = fs.Remove("slashdir/")
+		if err == nil {
+			t.Error("Expected error when removing non-existent directory entry")
 		}
 	})
 }

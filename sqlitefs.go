@@ -186,3 +186,46 @@ func (fs *SQLiteFS) Close() error {
 	fs.writerWg.Wait()
 	return fs.db.Close()
 }
+
+// Remove deletes a file or empty directory from the filesystem.
+// It follows os.Remove() semantics - directories must be empty.
+func (fs *SQLiteFS) Remove(path string) error {
+	// Normalize path (remove leading slash)
+	if len(path) > 0 && path[0] == '/' {
+		path = path[1:]
+	}
+
+	// Remove trailing slash for directory paths
+	if len(path) > 0 && path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+
+	// Check if this is a directory (has children)
+	var hasChildren bool
+	dirPrefix := path + "/"
+	err := fs.db.QueryRow("SELECT EXISTS(SELECT 1 FROM file_metadata WHERE path LIKE ? AND path != ?)", dirPrefix+"%", path).Scan(&hasChildren)
+	if err != nil {
+		return err
+	}
+	if hasChildren {
+		return &PathError{Op: "remove", Path: path, Err: errors.New("directory not empty")}
+	}
+
+	// Delete fragments first (due to foreign key constraint)
+	_, err = fs.db.Exec(`DELETE FROM file_fragments WHERE file_id IN (SELECT id FROM file_metadata WHERE path = ?)`, path)
+	if err != nil {
+		return err
+	}
+
+	// Delete metadata
+	result, err := fs.db.Exec(`DELETE FROM file_metadata WHERE path = ?`, path)
+	if err != nil {
+		return err
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return &PathError{Op: "remove", Path: path, Err: errors.New("file not found")}
+	}
+	return nil
+}
